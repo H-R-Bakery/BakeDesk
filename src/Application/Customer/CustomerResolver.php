@@ -15,8 +15,12 @@ final class CustomerResolver
     ) {
     }
 
-    public function resolve(string $name, PhoneNumber $phone): Customer
+    public function resolve(string $name, PhoneNumber $phone, ?Customer $selectedCustomer = null): Customer
     {
+        if (null !== $selectedCustomer && $selectedCustomer->isActive()) {
+            return $selectedCustomer;
+        }
+
         $customer = $this->customerRepository->findOneByPhone($phone);
         if (null !== $customer) {
             return $customer;

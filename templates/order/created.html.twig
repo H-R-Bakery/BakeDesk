@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+
+{% block body %}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <p class="text-success fw-semibold mb-2">Order saved</p>
+            <h1 class="h2 mb-4">Order {{ order.orderNumber }}</h1>
+
+            <dl class="row mb-4">
+                <dt class="col-sm-3">Customer</dt>
+                <dd class="col-sm-9">{{ order.customerName }}<br><span class="text-body-secondary">{{ order.customerPhone|phone_number_format('NATIONAL') }}</span></dd>
+                <dt class="col-sm-3">Pickup</dt>
+                <dd class="col-sm-9">{{ order.pickupAt|date('F j, Y g:i A', bakery_timezone) }}</dd>
+                <dt class="col-sm-3">Payment</dt>
+                <dd class="col-sm-9">{{ order.paid ? 'Paid' : 'Not paid' }}</dd>
+                {% if order.notes %}
+                    <dt class="col-sm-3">Notes</dt>
+                    <dd class="col-sm-9">{{ order.notes }}</dd>
+                {% endif %}
+            </dl>
+
+            <h2 class="h5">Items</h2>
+            <ul class="list-group mb-4">
+                {% for item in order.items %}
+                    <li class="list-group-item">
+                        <strong>{{ item.quantity }} {{ item.unit.name }} {{ item.productType.name }}</strong>
+                        <span class="text-body-secondary">&mdash; {{ item.description }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <a class="btn btn-primary" href="{{ path('order_new') }}">Enter another order</a>
+        </div>
+    </div>
+{% endblock %}

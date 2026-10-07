@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Order;
 
+use App\Entity\Customer;
 use App\Entity\Employee;
 use libphonenumber\PhoneNumber;
 
@@ -21,6 +22,7 @@ final readonly class OrderInput
         public bool $paid = false,
         public ?string $notes = null,
         public array $items = [],
+        public ?Customer $customer = null,
     ) {
     }
 }

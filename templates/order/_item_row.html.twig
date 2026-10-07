@@ -1,0 +1,30 @@
+<div class="order-item-row rounded border p-3 mb-3" data-order-items-row>
+    <div class="row g-3 align-items-end">
+        <div class="col-12 col-md-3">
+            {{ form_label(itemForm.productType) }}
+            {{ form_widget(itemForm.productType) }}
+            {{ form_errors(itemForm.productType) }}
+        </div>
+        <div class="col-6 col-md-2">
+            {{ form_label(itemForm.quantity) }}
+            {{ form_widget(itemForm.quantity) }}
+            {{ form_errors(itemForm.quantity) }}
+        </div>
+        <div class="col-6 col-md-2">
+            {{ form_label(itemForm.unit) }}
+            {{ form_widget(itemForm.unit) }}
+            {{ form_errors(itemForm.unit) }}
+        </div>
+        <div class="col-12 col-md-4">
+            {{ form_label(itemForm.description) }}
+            {{ form_widget(itemForm.description) }}
+            {{ form_errors(itemForm.description) }}
+        </div>
+        <div class="col-12 col-md-1 d-grid">
+            <button type="button" class="btn btn-outline-danger" data-action="order-items#remove">
+                <span aria-hidden="true">&times;</span>
+                <span class="visually-hidden">Remove item</span>
+            </button>
+        </div>
+    </div>
+</div>

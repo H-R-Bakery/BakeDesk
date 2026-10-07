@@ -23,7 +23,7 @@ final class OrderCreator
     public function create(OrderInput $input): Order
     {
         return $this->entityManager->wrapInTransaction(function () use ($input): Order {
-            $customer = $this->customerResolver->resolve($input->customerName, $input->customerPhone);
+            $customer = $this->customerResolver->resolve($input->customerName, $input->customerPhone, $input->customer);
 
             $order = (new Order())
                 ->setOrderNumber($this->orderNumberGenerator->next())
