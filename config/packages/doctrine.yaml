@@ -8,7 +8,7 @@ doctrine:
 
         profiling_collect_backtrace: '%kernel.debug%'
         charset: utf8
-        schema_filter: '~^(?!messenger_messages|rememberme_token)~'
+        schema_filter: '~^(?!(messenger_messages|rememberme_token|(public\.)?bakery_order_number_seq)$)~'
         types:
             phone_number: Misd\PhoneNumberBundle\Doctrine\DBAL\Types\PhoneNumberType
     orm:

@@ -16,11 +16,11 @@ final class Version20261007220000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE SEQUENCE bakery_order_number_seq START WITH 1000 INCREMENT BY 1');
+        $this->addSql('CREATE SEQUENCE public.bakery_order_number_seq START WITH 1000 INCREMENT BY 1');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP SEQUENCE bakery_order_number_seq');
+        $this->addSql('DROP SEQUENCE public.bakery_order_number_seq');
     }
 }

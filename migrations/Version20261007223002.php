@@ -20,7 +20,6 @@ final class Version20261007223002 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
-        $this->addSql('DROP SEQUENCE bakery_order_number_seq CASCADE');
         $this->addSql('ALTER TABLE bakery_order ALTER updated_at DROP NOT NULL');
         $this->addSql('ALTER TABLE customer ALTER updated_at DROP NOT NULL');
         $this->addSql('ALTER TABLE employee ALTER updated_at DROP NOT NULL');
@@ -30,7 +29,6 @@ final class Version20261007223002 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE SEQUENCE bakery_order_number_seq INCREMENT BY 1 MINVALUE 1 START 1');
         $this->addSql('ALTER TABLE bakery_order ALTER updated_at SET NOT NULL');
         $this->addSql('ALTER TABLE customer ALTER updated_at SET NOT NULL');
         $this->addSql('ALTER TABLE employee ALTER updated_at SET NOT NULL');

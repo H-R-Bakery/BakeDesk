@@ -8,7 +8,7 @@ use Doctrine\DBAL\Connection;
 
 final class OrderNumberGenerator
 {
-    public const SEQUENCE_NAME = 'bakery_order_number_seq';
+    public const SEQUENCE_NAME = 'public.bakery_order_number_seq';
 
     public function __construct(
         private Connection $connection,
@@ -18,7 +18,7 @@ final class OrderNumberGenerator
     public function next(): string
     {
         return (string) $this->connection->fetchOne(
-            "SELECT nextval('".self::SEQUENCE_NAME."')",
+            "SELECT nextval('".self::SEQUENCE_NAME."'::regclass)",
         );
     }
 }
