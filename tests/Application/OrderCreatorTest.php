@@ -8,6 +8,7 @@ use App\Application\Customer\CustomerResolver;
 use App\Application\Order\OrderCreator;
 use App\Application\Order\OrderInput;
 use App\Application\Order\OrderItemInput;
+use App\Application\Order\OrderNumberGenerator;
 use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
@@ -18,6 +19,7 @@ use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Repository\CustomerRepository;
 use App\Repository\OrderRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManager;
@@ -38,6 +40,8 @@ final class OrderCreatorTest extends TestCase
     private CustomerRepository $customerRepository;
 
     private OrderCreator $orderCreator;
+
+    private OrderRepository $orderRepository;
 
     protected function setUp(): void
     {
@@ -68,11 +72,15 @@ final class OrderCreatorTest extends TestCase
             ->willReturn($this->entityManager);
 
         $this->customerRepository = new CustomerRepository($registry);
-        $orderRepository = new OrderRepository($registry);
+        $this->orderRepository = new OrderRepository($registry);
+        $sequenceConnection = $this->createStub(Connection::class);
+        $sequenceConnection->method('fetchOne')->willReturn('1000');
+        $orderNumberGenerator = new OrderNumberGenerator($sequenceConnection);
         $this->orderCreator = new OrderCreator(
             $this->entityManager,
             new CustomerResolver($this->customerRepository),
-            $orderRepository,
+            $this->orderRepository,
+            $orderNumberGenerator,
         );
     }
 
@@ -90,7 +98,6 @@ final class OrderCreatorTest extends TestCase
         $this->entityManager->flush();
 
         $order = $this->orderCreator->create($this->orderInput(
-            orderNumber: '1001',
             customerName: 'Jenny Smith',
             customerPhone: $this->phone('(812) 555-1234'),
         ));
@@ -104,7 +111,6 @@ final class OrderCreatorTest extends TestCase
     public function testNewCustomerIsCreatedAndAttachedToTheOrder(): void
     {
         $order = $this->orderCreator->create($this->orderInput(
-            orderNumber: '1002',
             customerName: 'Alex Baker',
             customerPhone: $this->phone('+18125551235'),
         ));
@@ -120,7 +126,6 @@ final class OrderCreatorTest extends TestCase
     {
         $phone = $this->phone('+18125551236');
         $order = $this->orderCreator->create($this->orderInput(
-            orderNumber: '1003',
             customerName: 'Taylor Baker',
             customerPhone: $phone,
         ));
@@ -148,7 +153,6 @@ final class OrderCreatorTest extends TestCase
         $pickupAt = new \DateTimeImmutable('2026-10-10 09:30:00');
         $orderedAt = new \DateTimeImmutable('2026-10-07 14:15:00');
         $order = $this->orderCreator->create(new OrderInput(
-            orderNumber: '1004',
             customerName: 'Jamie Baker',
             customerPhone: $this->phone('+18125551238'),
             employee: $employee,
@@ -165,6 +169,7 @@ final class OrderCreatorTest extends TestCase
         self::assertSame($employee, $order->getEmployee());
         self::assertSame($pickupAt, $order->getPickupAt());
         self::assertSame($orderedAt, $order->getOrderedAt());
+        self::assertSame('1000', $order->getOrderNumber());
         self::assertTrue($order->isPaid());
         self::assertSame('Call when ready', $order->getNotes());
         self::assertSame('open', $order->getStatus()->value);
@@ -181,17 +186,43 @@ final class OrderCreatorTest extends TestCase
         }
     }
 
+    public function testIndependentOrderCreationsReceiveDifferentGeneratedNumbers(): void
+    {
+        $sequenceConnection = $this->createStub(Connection::class);
+        $sequenceConnection
+            ->method('fetchOne')
+            ->willReturnOnConsecutiveCalls('1000', '1001');
+        $orderNumberGenerator = new OrderNumberGenerator($sequenceConnection);
+        $this->orderCreator = new OrderCreator(
+            $this->entityManager,
+            new CustomerResolver($this->customerRepository),
+            $this->orderRepository,
+            $orderNumberGenerator,
+        );
+
+        $firstOrder = $this->orderCreator->create($this->orderInput(
+            customerName: 'First Customer',
+            customerPhone: $this->phone('+18125551241'),
+        ));
+        $secondOrder = $this->orderCreator->create($this->orderInput(
+            customerName: 'Second Customer',
+            customerPhone: $this->phone('+18125551242'),
+        ));
+
+        self::assertSame('1000', $firstOrder->getOrderNumber());
+        self::assertSame('1001', $secondOrder->getOrderNumber());
+        self::assertNotSame($firstOrder->getOrderNumber(), $secondOrder->getOrderNumber());
+    }
+
     public function testFailedOrderDoesNotCommitTheNewCustomer(): void
     {
         $this->orderCreator->create($this->orderInput(
-            orderNumber: '1005',
             customerName: 'First Customer',
             customerPhone: $this->phone('+18125551239'),
         ));
 
         try {
             $this->orderCreator->create($this->orderInput(
-                orderNumber: '1005',
                 customerName: 'Second Customer',
                 customerPhone: $this->phone('+18125551240'),
             ));
@@ -202,14 +233,13 @@ final class OrderCreatorTest extends TestCase
         }
     }
 
-    private function orderInput(string $orderNumber, string $customerName, PhoneNumber $customerPhone): OrderInput
+    private function orderInput(string $customerName, PhoneNumber $customerPhone): OrderInput
     {
         $employee = (new Employee())->setName('Counter Employee');
         $this->entityManager->persist($employee);
         $this->entityManager->flush();
 
         return new OrderInput(
-            orderNumber: $orderNumber,
             customerName: $customerName,
             customerPhone: $customerPhone,
             employee: $employee,

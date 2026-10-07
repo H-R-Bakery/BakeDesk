@@ -16,6 +16,7 @@ final class OrderCreator
         private EntityManagerInterface $entityManager,
         private CustomerResolver $customerResolver,
         private OrderRepository $orderRepository,
+        private OrderNumberGenerator $orderNumberGenerator,
     ) {
     }
 
@@ -25,7 +26,7 @@ final class OrderCreator
             $customer = $this->customerResolver->resolve($input->customerName, $input->customerPhone);
 
             $order = (new Order())
-                ->setOrderNumber($input->orderNumber)
+                ->setOrderNumber($this->orderNumberGenerator->next())
                 ->setCustomer($customer)
                 ->setCustomerName($input->customerName)
                 ->setCustomerPhone($input->customerPhone)

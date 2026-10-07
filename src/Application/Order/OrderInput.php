@@ -13,7 +13,6 @@ final readonly class OrderInput
      * @param list<OrderItemInput> $items
      */
     public function __construct(
-        public string $orderNumber,
         public string $customerName,
         public PhoneNumber $customerPhone,
         public Employee $employee,
