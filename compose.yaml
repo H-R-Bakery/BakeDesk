@@ -15,7 +15,7 @@ services:
     volumes:
 #      - database_data:/var/lib/postgresql/data:rw
       # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-       - ./docker/db/data:/var/lib/postgresql/data:rw
+       - $PWD/docker/db/data:/var/lib/postgresql:rw
   ###< doctrine/doctrine-bundle ###
   redis:
     image: redis:8-alpine
@@ -39,20 +39,20 @@ services:
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins http://127.0.0.1:8000
     # Comment the following line to disable the development mode
-    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
+#    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost/healthz"]
+      test: ["CMD", "curl", "-fk", "https://localhost:3000/healthz"]
       timeout: 5s
       retries: 5
       start_period: 60s
     volumes:
-      - ./docker/mercure/data:/data
-      - ./docker/mercure/config:/config
+      - $PWD/docker/mercure/data:/data
+      - $PWD/docker/mercure/config:/config
     ports:
       - "3000:80"
 
 ###< symfony/mercure-bundle ###
-volumes:
+#volumes:
   ###> doctrine/doctrine-bundle ###
 #  database_data:
 ###< doctrine/doctrine-bundle ###

@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Server Stop" type="BashProRunConfiguration" singleton="false">
+    <option name="interpreterParameters" value="local:server:stop" />
+    <option name="interpreterPath" value="/usr/bin/symfony" />
+    <scriptContent>symfony local:server:stop</scriptContent>
+    <option name="sourceType" value="snippet" />
+    <option name="workingDirectory" value="$ProjectFileDir$" />
+    <RunnerSettings bashdbVersion="Automatic" bashPathMapper="Automatic" RunnerId="pro.bashsupport.shDebugRunner" />
+    <method v="2" />
+  </configuration>
+</component>

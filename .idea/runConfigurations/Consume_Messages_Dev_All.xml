@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Consume Messages Dev All" type="PhpLocalRunConfigurationType" factoryName="PHP Console" path="$PROJECT_DIR$/bin/console" scriptParameters="messenger:consume --env=dev --profile -vv internal data email sms">
+    <CommandLine workingDirectory="$PROJECT_DIR$" />
+    <method v="2" />
+  </configuration>
+</component>

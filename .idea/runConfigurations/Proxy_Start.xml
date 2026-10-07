@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Proxy Start" type="BashProRunConfiguration" singleton="true">
+    <option name="interpreterParameters" value="proxy:start -f" />
+    <option name="interpreterPath" value="/usr/bin/symfony" />
+    <scriptContent>symfony proxy:start -f</scriptContent>
+    <option name="sourceType" value="snippet" />
+    <option name="workingDirectory" value="$ProjectFileDir$" />
+    <RunnerSettings bashdbVersion="Automatic" bashPathMapper="Automatic" RunnerId="pro.bashsupport.shDebugRunner" />
+    <method v="2" />
+  </configuration>
+</component>

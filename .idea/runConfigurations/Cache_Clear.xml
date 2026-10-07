@@ -1,0 +1,6 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Cache Clear" type="PhpLocalRunConfigurationType" factoryName="PHP Console" path="$PROJECT_DIR$/bin/console" scriptParameters="cache:clear">
+    <CommandLine workingDirectory="$PROJECT_DIR$" />
+    <method v="2" />
+  </configuration>
+</component>

@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Sass Build Watch" type="BashProRunConfiguration">
+    <scriptContent>symfony console sass:build -v --watch</scriptContent>
+    <option name="sourceType" value="snippet" />
+    <option name="workingDirectory" value="$ProjectFileDir$" />
+    <RunnerSettings bashdbVersion="Automatic" bashPathMapper="Automatic" RunnerId="pro.bashsupport.shDebugRunner" />
+    <method v="2" />
+  </configuration>
+</component>
