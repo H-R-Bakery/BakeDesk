@@ -6,9 +6,13 @@ use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
+use App\Entity\Printer;
+use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Model\OrderStatus;
+use App\Model\PrintDocumentType;
+use App\Model\PrintJobStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaValidator;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -22,12 +26,12 @@ final class DomainMappingTest extends KernelTestCase
         $entityManager = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = array_map(
             $entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class],
+            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, Printer::class, PrintJob::class],
         );
 
         self::assertSame([], (new SchemaValidator($entityManager))->validateMapping());
 
-        self::assertSame(['customer', 'employee', 'product_type', 'unit', 'bakery_order', 'order_item'], array_map(
+        self::assertSame(['customer', 'employee', 'product_type', 'unit', 'bakery_order', 'order_item', 'printer', 'print_job'], array_map(
             static fn ($entityMetadata): string => $entityMetadata->getTableName(),
             $metadata,
         ));
@@ -44,5 +48,16 @@ final class DomainMappingTest extends KernelTestCase
         self::assertSame('decimal', $quantityMapping->type);
         self::assertSame(10, $quantityMapping->precision);
         self::assertSame(2, $quantityMapping->scale);
+
+        $printJobMetadata = $entityManager->getClassMetadata(PrintJob::class);
+        self::assertSame(PrintDocumentType::class, $printJobMetadata->getFieldMapping('documentType')->enumType);
+        self::assertSame(PrintJobStatus::class, $printJobMetadata->getFieldMapping('status')->enumType);
+        self::assertSame('date_immutable', $printJobMetadata->getFieldMapping('reportDate')->type);
+        self::assertTrue($printJobMetadata->getFieldMapping('reportDate')->nullable);
+
+        $printerMetadata = $entityManager->getClassMetadata(Printer::class);
+        self::assertTrue($printerMetadata->hasField('active'));
+        self::assertSame('datetime_immutable', $printerMetadata->getFieldMapping('createdAt')->type);
+        self::assertSame('datetime_immutable', $printerMetadata->getFieldMapping('updatedAt')->type);
     }
 }
