@@ -16,6 +16,8 @@ services:
 #      - database_data:/var/lib/postgresql/data:rw
       # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
        - $PWD/docker/db/data:/var/lib/postgresql:rw
+    ports:
+      - "5432:5432"
   ###< doctrine/doctrine-bundle ###
   redis:
     image: redis:8-alpine
@@ -32,7 +34,7 @@ services:
     restart: unless-stopped
     environment:
       # Uncomment the following line to disable HTTPS,
-      #SERVER_NAME: ':80'
+      SERVER_NAME: ':80'
       MERCURE_PUBLISHER_JWT_KEY: "${MERCURE_JWT_SECRET}"
       MERCURE_SUBSCRIBER_JWT_KEY: "${MERCURE_JWT_SECRET}"
       # Set the URL of your Symfony project (without trailing slash!) as value of the cors_origins directive
@@ -41,7 +43,14 @@ services:
     # Comment the following line to disable the development mode
 #    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
     healthcheck:
-      test: ["CMD", "curl", "-fk", "https://localhost:3000/healthz"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "--spider",
+          "http://localhost:2019/mercure/health/ready"
+        ]
       timeout: 5s
       retries: 5
       start_period: 60s

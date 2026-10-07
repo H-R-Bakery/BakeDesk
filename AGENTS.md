@@ -4,17 +4,28 @@ This is a Symfony project. Check `composer.json` for the exact Symfony/PHP versi
 in use, and read `symfony.lock` to see which recipes ran. Don't assume Doctrine,
 Twig, API Platform, Messenger, or Lock are installed unless one of those says so.
 
-## Ask before generating
+## Project architecture
 
-If the task doesn't specify, ask rather than guess:
+This project is BakeSlip, a local bakery order-management application.
 
-- Persistence: Doctrine ORM, Doctrine ODM, or none?
-- Interface: server-rendered (Twig), API (Serializer, maybe API Platform), or both?
-- Auth: SecurityBundle, and which authenticator?
+Established decisions:
 
-If you can't ask (no interactive channel), state the assumption you're making and
-pick the smallest option (e.g. no persistence layer) rather than scaffolding a
-full stack nobody asked for.
+- Symfony 8.1, kept on the latest stable Symfony release.
+- PHP 8.4+.
+- Doctrine ORM with PostgreSQL.
+- Server-rendered Twig application with Stimulus/Turbo where useful.
+- Redis for Symfony Messenger.
+- Mercure for realtime UI updates.
+- EasyAdmin will be used for the secured administration area.
+- Public ordering and production-report screens do not require authentication.
+- `/admin` requires authentication.
+- Printing is asynchronous through Messenger.
+- Printer configuration is stored in the database and uses IPP addresses.
+- Label and report printers are configurable; do not hard-code a printer model.
+- CUPS/IPP printing infrastructure must stay isolated behind a printer service abstraction.
+- Raspberry Pi is the intended production host.
+- Application services run with Docker Compose; hardware-facing CUPS runs on the host.
+- Use backed PHP enums for internal workflow/state values such as OrderStatus and PrintJobStatus. Do not use enums for admin-managed reference data such as Employee, ProductType, Unit, or Printer.
 
 ## Adding features: Flex, not hand-wiring
 
@@ -106,3 +117,83 @@ things up in the project instead of relying on memory:
 - Read the installed source and docblocks under `vendor/`.
 - Docs: https://symfony.com/doc/current/ (switch to the version matching
   `composer.json` if it differs).
+
+## Domain rules
+
+Core entities planned for V1:
+
+- Customer
+- Employee
+- Order
+- OrderItem
+- ProductType
+- Unit
+- Printer
+- PrintJob
+
+Order-entry rules:
+
+- Employee selection is a small radio-button list.
+- The browser remembers the last selected employee locally.
+- Customer name/phone autocomplete existing customers.
+- Saving an order automatically creates a customer when no existing customer matches.
+- Front-counter users never explicitly create customers.
+- Customer phone numbers should be normalized for matching/search.
+- Orders preserve customer name/phone snapshots even when linked to a Customer.
+- Pickup is stored as a datetime.
+- Orders have human-readable order numbers.
+- Cancelled orders are retained rather than deleted.
+
+Order item fields:
+
+- Product type
+- Quantity
+- Unit
+- Description
+
+Initial product types:
+
+- Donuts
+- Brownies
+- Cookies
+- Shape Cookies
+
+Initial units:
+
+- Each
+- Dozen
+- Half Dozen
+- Tray
+- Box
+
+Production reports:
+
+- Group by product type.
+- Do not normalize free-form descriptions in V1.
+- Show totals by identical unit where useful.
+- Reports can be downloaded or asynchronously printed to a configured report printer.
+
+Printing:
+
+- Printers have a name, IPP address, active state, and capabilities such as labels/reports.
+- Printers are not tied to JADENS or any other vendor.
+- Labels are 4x6.
+- Saving an order must succeed independently of printing.
+- Print jobs are durable database entities.
+- Messenger messages should contain identifiers, not Doctrine entities.
+- Print status should be publishable through Mercure.
+
+## Definition of done
+
+Before considering a feature complete:
+
+1. Run relevant PHPUnit tests.
+2. Run `bin/console lint:container`.
+3. Run Twig/YAML linters when those files changed.
+4. Run PHPStan when installed.
+5. Run php-cs-fixer check when installed.
+6. For Doctrine model changes:
+   - generate a migration,
+   - inspect the migration,
+   - do not use `doctrine:schema:update`.
+7. Do not leave generated TODOs or placeholder implementations.
