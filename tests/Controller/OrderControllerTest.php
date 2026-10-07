@@ -13,6 +13,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Model\OrderStatus;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -178,6 +179,206 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(0, $this->entityManager->getRepository(Order::class)->count([]));
     }
 
+    public function testOpenOrderCanBeEditedAndKeepsItsOrderNumber(): void
+    {
+        [$employee, $replacementEmployee] = $this->createEmployees();
+        $replacementEmployee->setActive(true);
+        $this->entityManager->flush();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Original Customer', '+18125551234');
+        $order = $this->createOrder('3000', $employee, $productType, $unit, $customer);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSame('Original Customer', $crawler->filter('input[name="new_order[customerName]"]')->attr('value'));
+        self::assertSame('3000', $order->getOrderNumber());
+
+        $form = $crawler->selectButton('Save changes')->form();
+        $values = $form->getPhpValues();
+        $values['new_order']['customerName'] = 'Updated Customer';
+        $values['new_order']['customerPhone'] = '8125551234';
+        $values['new_order']['employee'] = (string) $replacementEmployee->getId();
+        $values['new_order']['pickupDate'] = '2026-10-12';
+        $values['new_order']['pickupTime'] = '14:45';
+        $values['new_order']['paid'] = '1';
+        $values['new_order']['notes'] = 'Updated notes';
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/edit', $values);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $updatedOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+
+        self::assertInstanceOf(Order::class, $updatedOrder);
+        self::assertSame('3000', $updatedOrder->getOrderNumber());
+        self::assertSame('Updated Customer', $updatedOrder->getCustomerName());
+        self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($updatedOrder->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
+        self::assertSame($replacementEmployee->getId(), $updatedOrder->getEmployee()?->getId());
+        self::assertSame('2026-10-12 14:45:00', $updatedOrder->getPickupAt()?->format('Y-m-d H:i:s'));
+        self::assertTrue($updatedOrder->isPaid());
+        self::assertSame('Updated notes', $updatedOrder->getNotes());
+    }
+
+    public function testEditingReassociatesToPhoneMatchWithoutRenamingExistingCustomer(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $originalCustomer = $this->createCustomer('Original Customer', '+18125551234');
+        $replacementCustomer = $this->createCustomer('Replacement Customer', '+18125551235');
+        $order = $this->createOrder('3001', $employee, $productType, $unit, $originalCustomer);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+        $form = $crawler->selectButton('Save changes')->form();
+        $values = $form->getPhpValues();
+        $values['new_order']['customerName'] = 'Order Snapshot Name';
+        $values['new_order']['customerPhone'] = '(812) 555-1235';
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/edit', $values);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $updatedOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        $storedOriginalCustomer = $this->entityManager->getRepository(Customer::class)->find($originalCustomer->getId());
+        $storedReplacementCustomer = $this->entityManager->getRepository(Customer::class)->find($replacementCustomer->getId());
+
+        self::assertInstanceOf(Order::class, $updatedOrder);
+        $updatedPhone = $updatedOrder->getCustomerPhone();
+        self::assertNotNull($updatedPhone);
+        self::assertSame($replacementCustomer->getId(), $updatedOrder->getCustomer()?->getId());
+        self::assertSame('Order Snapshot Name', $updatedOrder->getCustomerName());
+        self::assertSame('+18125551235', PhoneNumberUtil::getInstance()->format($updatedPhone, \libphonenumber\PhoneNumberFormat::E164));
+        self::assertSame('Original Customer', $storedOriginalCustomer?->getName());
+        self::assertSame('Replacement Customer', $storedReplacementCustomer?->getName());
+    }
+
+    public function testEditingWithUnknownPhoneCreatesAndAssociatesANewCustomer(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $originalCustomer = $this->createCustomer('Original Customer', '+18125551234');
+        $order = $this->createOrder('3002', $employee, $productType, $unit, $originalCustomer);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+        $form = $crawler->selectButton('Save changes')->form();
+        $values = $form->getPhpValues();
+        $values['new_order']['customerName'] = 'New Customer';
+        $values['new_order']['customerPhone'] = '8125551236';
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/edit', $values);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $updatedOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        $newCustomer = $updatedOrder?->getCustomer();
+
+        self::assertInstanceOf(Customer::class, $newCustomer);
+        self::assertNotSame($originalCustomer->getId(), $newCustomer->getId());
+        self::assertSame('New Customer', $newCustomer->getName());
+        self::assertSame('New Customer', $updatedOrder?->getCustomerName());
+        self::assertSame(2, $this->entityManager->getRepository(Customer::class)->count([]));
+    }
+
+    public function testEditingSynchronizesItemsAndUsesVisualOrderForSortOrder(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Customer', '+18125551234');
+        $order = $this->createOrder('3003', $employee, $productType, $unit, $customer, itemCount: 2);
+        $removedItem = $order->getItems()->toArray()[1];
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+        $form = $crawler->selectButton('Save changes')->form();
+        $values = $form->getPhpValues();
+        $values['new_order']['items'][0]['quantity'] = '3';
+        $values['new_order']['items'][0]['description'] = 'Updated glazed';
+        unset($values['new_order']['items'][1]);
+        $values['new_order']['items'][2] = [
+            'productType' => (string) $productType->getId(),
+            'quantity' => '1.5',
+            'unit' => (string) $unit->getId(),
+            'description' => 'Added chocolate',
+        ];
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/edit', $values);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $updatedOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        $items = $updatedOrder?->getItems()->toArray() ?? [];
+
+        self::assertCount(2, $items);
+        self::assertSame(['Updated glazed', 'Added chocolate'], array_map(static fn (OrderItem $item): string => $item->getDescription(), $items));
+        self::assertSame(['3', '1.5'], array_map(static fn (OrderItem $item): string => $item->getQuantity(), $items));
+        self::assertSame([0, 1], array_map(static fn (OrderItem $item): int => $item->getSortOrder(), $items));
+        self::assertNull($this->entityManager->getRepository(OrderItem::class)->find($removedItem->getId()));
+    }
+
+    public function testCancellationRequiresCsrfAndRetainsHistoricalData(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Customer', '+18125551234');
+        $order = $this->createOrder('3004', $employee, $productType, $unit, $customer);
+        $orderId = $order->getId();
+        $itemId = $order->getItems()->first()->getId();
+
+        $crawler = $this->client->request('GET', '/orders/'.$orderId);
+        self::assertSelectorExists('a[href="/orders/'.$orderId.'/edit"]');
+        self::assertSelectorExists('button[data-bs-target="#cancel-order-modal"]');
+        self::assertSelectorExists('form[action="/orders/'.$orderId.'/cancel"]');
+
+        $this->client->request('POST', '/orders/'.$orderId.'/cancel');
+        self::assertResponseStatusCodeSame(403);
+
+        $cancelForm = $crawler->filter('form[action="/orders/'.$orderId.'/cancel"]');
+        $token = $cancelForm->filter('input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$orderId.'/cancel', ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$orderId);
+        $this->entityManager->clear();
+        $cancelledOrder = $this->entityManager->getRepository(Order::class)->find($orderId);
+
+        self::assertInstanceOf(Order::class, $cancelledOrder);
+        self::assertSame(OrderStatus::CANCELLED, $cancelledOrder->getStatus());
+        self::assertSame('3004', $cancelledOrder->getOrderNumber());
+        self::assertSame($customer->getId(), $cancelledOrder->getCustomer()?->getId());
+        self::assertSame($employee->getId(), $cancelledOrder->getEmployee()?->getId());
+        self::assertCount(1, $cancelledOrder->getItems());
+        self::assertInstanceOf(OrderItem::class, $this->entityManager->getRepository(OrderItem::class)->find($itemId));
+
+        $this->client->request('GET', '/orders');
+        self::assertSelectorNotExists('#orders-table');
+        $this->client->request('GET', '/orders?status=cancelled');
+        self::assertSelectorTextContains('#orders-table', '3004');
+        $this->client->request('GET', '/orders?status=all&q=3004');
+        self::assertSelectorTextContains('#orders-table', '3004');
+
+        $this->client->request('GET', '/orders/'.$orderId);
+        self::assertSelectorTextContains('body', 'Cancelled');
+        self::assertSelectorNotExists('a[href="/orders/'.$orderId.'/edit"]');
+        self::assertSelectorNotExists('#cancel-order-modal');
+    }
+
+    public function testCompletedAndCancelledOrdersCannotBeEdited(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Customer', '+18125551234');
+        $completed = $this->createOrder('3005', $employee, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $cancelled = $this->createOrder('3006', $employee, $productType, $unit, $customer, OrderStatus::CANCELLED);
+
+        $this->client->request('GET', '/orders/'.$completed->getId().'/edit');
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/orders/'.$cancelled->getId().'/edit');
+        self::assertResponseStatusCodeSame(403);
+    }
+
     private function submitOrder(Employee $employee, ProductType $productType, Unit $unit, string $name, string $phone, int $orderNumber): void
     {
         $crawler = $this->client->request('GET', '/order/new');
@@ -241,5 +442,39 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         return $customer;
+    }
+
+    private function createOrder(
+        string $number,
+        Employee $employee,
+        ProductType $productType,
+        Unit $unit,
+        Customer $customer,
+        OrderStatus $status = OrderStatus::OPEN,
+        int $itemCount = 1,
+    ): Order {
+        $order = (new Order())
+            ->setOrderNumber($number)
+            ->setCustomer($customer)
+            ->setEmployee($employee)
+            ->setPickupAt(new \DateTimeImmutable('2026-10-10 09:00:00', new \DateTimeZone('America/Indiana/Indianapolis')))
+            ->setOrderedAt(new \DateTimeImmutable('2026-10-07 14:00:00', new \DateTimeZone('America/Indiana/Indianapolis')))
+            ->setStatus($status);
+
+        for ($index = 0; $index < $itemCount; ++$index) {
+            $order->addItem(
+                (new OrderItem())
+                    ->setProductType($productType)
+                    ->setQuantity((string) ($index + 1))
+                    ->setUnit($unit)
+                    ->setDescription(0 === $index ? 'Glazed' : 'Chocolate')
+                    ->setSortOrder($index),
+            );
+        }
+
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        return $order;
     }
 }

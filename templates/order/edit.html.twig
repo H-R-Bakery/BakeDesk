@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+
+{% form_theme form 'bootstrap_5_layout.html.twig' %}
+
+{% block title %}Edit Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+
+{% block body %}
+    {% include 'order/_form.html.twig' with {
+        title: 'Edit order ' ~ order.orderNumber,
+        description: 'Update the order details and items.',
+        submit_label: 'Save changes'
+    } %}
+{% endblock %}

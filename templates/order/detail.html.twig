@@ -9,7 +9,15 @@
             <p class="text-body-secondary mb-1"><a href="{{ path('order_index') }}">Orders</a></p>
             <h1 class="h2 mb-0">Order {{ order.orderNumber }}</h1>
         </div>
-        <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
+        <div class="d-flex flex-wrap gap-2">
+            {% if order.status.value == 'open' %}
+                <a class="btn btn-outline-primary" href="{{ path('order_edit', {id: order.id}) }}">Edit order</a>
+                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-order-modal">
+                    Cancel order
+                </button>
+            {% endif %}
+            <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
+        </div>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -57,4 +65,27 @@
             </div>
         </div>
     </div>
+
+    {% if order.status.value == 'open' %}
+        <div class="modal fade" id="cancel-order-modal" tabindex="-1" aria-labelledby="cancel-order-modal-label" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5" id="cancel-order-modal-label">Cancel Order #{{ order.orderNumber }}?</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        This keeps the order in history but removes it from active upcoming orders.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Keep order</button>
+                        <form method="post" action="{{ path('order_cancel', {id: order.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('cancel-order-' ~ order.id) }}">
+                            <button type="submit" class="btn btn-danger">Cancel order</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}

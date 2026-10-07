@@ -19,12 +19,18 @@ final class NewOrderInputFactory
 
     public function create(NewOrderData $data): Order
     {
+        return $this->orderCreator->create($this->createInput($data));
+    }
+
+    public function createInput(NewOrderData $data): OrderInput
+    {
         if (null === $data->customerPhone || null === $data->employee || null === $data->pickupDate || null === $data->pickupTime) {
-            throw new \LogicException('A valid new order form is required.');
+            throw new \LogicException('A valid order form is required.');
         }
 
         $items = [];
-        foreach ($data->items as $sortOrder => $item) {
+        $sortOrder = 0;
+        foreach ($data->items as $item) {
             if (null === $item->productType || null === $item->quantity || null === $item->unit) {
                 throw new \LogicException('A valid order item is required.');
             }
@@ -34,13 +40,14 @@ final class NewOrderInputFactory
                 quantity: $item->quantity,
                 unit: $item->unit,
                 description: trim($item->description),
-                sortOrder: $sortOrder,
+                sortOrder: $sortOrder++,
+                id: $item->id,
             );
         }
 
         $selectedCustomer = null === $data->customerId ? null : $this->customerRepository->find($data->customerId);
 
-        return $this->orderCreator->create(new OrderInput(
+        return new OrderInput(
             customerName: trim($data->customerName),
             customerPhone: $data->customerPhone,
             employee: $data->employee,
@@ -50,6 +57,6 @@ final class NewOrderInputFactory
             notes: null === $data->notes || '' === trim($data->notes) ? null : trim($data->notes),
             items: $items,
             customer: $selectedCustomer,
-        ));
+        );
     }
 }

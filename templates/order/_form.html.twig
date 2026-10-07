@@ -1,0 +1,102 @@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+        <h1 class="h2 mb-1">{{ title }}</h1>
+        <p class="text-body-secondary mb-0">{{ description }}</p>
+    </div>
+</div>
+
+{{ form_start(form, {attr: {class: 'needs-validation'}}) }}
+    {{ form_errors(form) }}
+
+    <section class="card shadow-sm mb-4" aria-labelledby="customer-heading">
+        <div class="card-body">
+            <h2 class="h5 card-title" id="customer-heading">Customer</h2>
+            <div class="row g-3" data-controller="customer-autocomplete" data-customer-autocomplete-url-value="{{ autocomplete_url }}">
+                <div class="col-12 col-md-6 position-relative">
+                    {{ form_label(form.customerName) }}
+                    {{ form_widget(form.customerName, {attr: {
+                        'data-action': 'input->customer-autocomplete#search keydown->customer-autocomplete#navigate'
+                    }}) }}
+                    {{ form_errors(form.customerName) }}
+                    {{ form_widget(form.customerId) }}
+                    <div class="autocomplete-results list-group position-absolute start-0 end-0 top-100 z-3 shadow-sm d-none"
+                         data-customer-autocomplete-target="results"
+                         role="listbox"
+                         aria-label="Customer suggestions"></div>
+                </div>
+                <div class="col-12 col-md-6">
+                    {{ form_label(form.customerPhone) }}
+                    {{ form_widget(form.customerPhone, {attr: {
+                        'data-action': 'input->customer-autocomplete#search keydown->customer-autocomplete#navigate'
+                    }}) }}
+                    {{ form_errors(form.customerPhone) }}
+                </div>
+            </div>
+            <div class="form-text mt-3">Start typing a name or phone number to find an existing customer.</div>
+        </div>
+    </section>
+
+    <section class="card shadow-sm mb-4" aria-labelledby="order-information-heading">
+        <div class="card-body">
+            <h2 class="h5 card-title" id="order-information-heading">Order information</h2>
+            <div class="mb-3" data-controller="employee-preference">
+                {{ form_label(form.employee) }}
+                <div class="d-flex flex-wrap gap-3 mt-2">
+                    {% for employee in form.employee %}
+                        <div class="form-check form-check-inline">
+                            {{ form_widget(employee) }}
+                            {{ form_label(employee) }}
+                        </div>
+                    {% else %}
+                        <p class="text-body-secondary mb-0">No active employees are available.</p>
+                    {% endfor %}
+                </div>
+                {{ form_errors(form.employee) }}
+            </div>
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    {{ form_row(form.pickupDate) }}
+                </div>
+                <div class="col-12 col-md-4">
+                    {{ form_row(form.pickupTime) }}
+                </div>
+                <div class="col-12 col-md-4 d-flex align-items-end">
+                    <div class="form-check mb-2">
+                        {{ form_widget(form.paid) }}
+                        {{ form_label(form.paid) }}
+                        {{ form_errors(form.paid) }}
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                {{ form_row(form.notes) }}
+            </div>
+        </div>
+    </section>
+
+    {% set item_prototype %}
+        {% include 'order/_item_row.html.twig' with {itemForm: form.items.vars.prototype} %}
+    {% endset %}
+    <section class="card shadow-sm mb-4" aria-labelledby="items-heading" data-controller="order-items"
+             data-order-items-prototype-value="{{ item_prototype|e('html_attr') }}"
+             data-order-items-index-value="{{ form.items|length }}">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h5 card-title mb-0" id="items-heading">Items</h2>
+                <button type="button" class="btn btn-outline-primary" data-action="order-items#add">
+                    + Add item
+                </button>
+            </div>
+            <div data-order-items-target="container">
+                {% for itemForm in form.items %}
+                    {% include 'order/_item_row.html.twig' with {itemForm: itemForm} %}
+                {% endfor %}
+            </div>
+            {{ form_errors(form.items) }}
+        </div>
+    </section>
+
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary btn-lg px-4">{{ submit_label }}</button>
+    </div>
+{{ form_end(form) }}

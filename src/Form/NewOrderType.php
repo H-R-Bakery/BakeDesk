@@ -33,6 +33,13 @@ final class NewOrderType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
+        $employees = $this->employeeRepository->findActiveOrdered();
+        if (true === $options['include_inactive'] && $options['data'] instanceof NewOrderData) {
+            if (null !== $options['data']->employee && !$options['data']->employee->isActive()) {
+                array_unshift($employees, $options['data']->employee);
+            }
+        }
+
         $builder
             ->add('customerName', TextType::class, [
                 'label' => 'Customer name',
@@ -59,7 +66,7 @@ final class NewOrderType extends AbstractType
             ])
             ->add('employee', EntityType::class, [
                 'class' => Employee::class,
-                'choices' => $this->employeeRepository->findActiveOrdered(),
+                'choices' => $employees,
                 'choice_label' => 'name',
                 'expanded' => true,
                 'multiple' => false,
@@ -104,6 +111,9 @@ final class NewOrderType extends AbstractType
             ])
             ->add('items', CollectionType::class, [
                 'entry_type' => NewOrderItemType::class,
+                'entry_options' => [
+                    'include_inactive' => $options['include_inactive'],
+                ],
                 'allow_add' => true,
                 'allow_delete' => true,
                 'by_reference' => false,
@@ -117,6 +127,8 @@ final class NewOrderType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => NewOrderData::class,
+            'include_inactive' => false,
         ]);
+        $resolver->setAllowedTypes('include_inactive', 'bool');
     }
 }

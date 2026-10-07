@@ -1,4 +1,5 @@
 import './stimulus_bootstrap.js';
+import 'bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-table/dist/bootstrap-table.min.css';
 import './bootstrap_table.js';

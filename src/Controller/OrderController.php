@@ -6,7 +6,10 @@ namespace App\Controller;
 
 use App\Application\Order\BakeryClock;
 use App\Application\Order\NewOrderInputFactory;
+use App\Application\Order\OrderCanceller;
+use App\Application\Order\OrderFormDataFactory;
 use App\Application\Order\OrderSearchCriteria;
+use App\Application\Order\OrderUpdater;
 use App\Entity\Order;
 use App\Form\Model\NewOrderData;
 use App\Form\NewOrderType;
@@ -16,6 +19,7 @@ use App\Repository\OrderRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class OrderController extends AbstractController
@@ -97,6 +101,64 @@ final class OrderController extends AbstractController
             'order' => $order,
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
+    }
+
+    #[Route('/orders/{id<\d+>}/edit', name: 'order_edit', methods: ['GET', 'POST'])]
+    public function edit(
+        int $id,
+        Request $request,
+        OrderRepository $orderRepository,
+        OrderFormDataFactory $orderFormDataFactory,
+        NewOrderInputFactory $newOrderInputFactory,
+        OrderUpdater $orderUpdater,
+    ): Response {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (OrderStatus::OPEN !== $order->getStatus()) {
+            throw new AccessDeniedHttpException('Only open orders can be edited.');
+        }
+
+        $data = $orderFormDataFactory->fromOrder($order);
+        $form = $this->createForm(NewOrderType::class, $data, [
+            'action' => $this->generateUrl('order_edit', ['id' => $id]),
+            'include_inactive' => true,
+        ]);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $orderUpdater->update($order, $newOrderInputFactory->createInput($data));
+            $this->addFlash('success', sprintf('Order #%s updated.', $order->getOrderNumber()));
+
+            return $this->redirectToRoute('order_detail', ['id' => $id]);
+        }
+
+        return $this->render('order/edit.html.twig', [
+            'form' => $form,
+            'order' => $order,
+            'autocomplete_url' => $this->generateUrl('customer_autocomplete'),
+        ]);
+    }
+
+    #[Route('/orders/{id<\d+>}/cancel', name: 'order_cancel', methods: ['POST'])]
+    public function cancel(int $id, Request $request, OrderRepository $orderRepository, OrderCanceller $orderCanceller): Response
+    {
+        $order = $orderRepository->find($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (OrderStatus::OPEN !== $order->getStatus()) {
+            throw new AccessDeniedHttpException('Only open orders can be cancelled.');
+        }
+        if (!$this->isCsrfTokenValid('cancel-order-'.$id, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+
+        $orderCanceller->cancel($order);
+        $this->addFlash('success', sprintf('Order #%s cancelled.', $order->getOrderNumber()));
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
     }
 
     #[Route('/order/{id<\d+>}/created', name: 'order_created', methods: ['GET'])]

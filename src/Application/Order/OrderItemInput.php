@@ -15,6 +15,7 @@ final readonly class OrderItemInput
         public Unit $unit,
         public string $description,
         public int $sortOrder = 0,
+        public ?int $id = null,
     ) {
     }
 }

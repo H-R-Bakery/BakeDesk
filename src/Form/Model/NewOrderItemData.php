@@ -10,6 +10,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final class NewOrderItemData
 {
+    public ?int $id = null;
+
     #[Assert\NotNull(message: 'Choose a product type.')]
     public ?ProductType $productType = null;
 

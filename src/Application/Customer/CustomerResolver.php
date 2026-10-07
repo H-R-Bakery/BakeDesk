@@ -7,6 +7,8 @@ namespace App\Application\Customer;
 use App\Entity\Customer;
 use App\Repository\CustomerRepository;
 use libphonenumber\PhoneNumber;
+use libphonenumber\PhoneNumberFormat;
+use libphonenumber\PhoneNumberUtil;
 
 final class CustomerResolver
 {
@@ -18,7 +20,10 @@ final class CustomerResolver
     public function resolve(string $name, PhoneNumber $phone, ?Customer $selectedCustomer = null): Customer
     {
         if (null !== $selectedCustomer && $selectedCustomer->isActive()) {
-            return $selectedCustomer;
+            $phoneUtil = PhoneNumberUtil::getInstance();
+            if ($phoneUtil->format($selectedCustomer->getPhone(), PhoneNumberFormat::E164) === $phoneUtil->format($phone, PhoneNumberFormat::E164)) {
+                return $selectedCustomer;
+            }
         }
 
         $customer = $this->customerRepository->findOneByPhone($phone);

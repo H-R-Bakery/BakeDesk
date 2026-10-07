@@ -29,6 +29,11 @@
             </div>
         </nav>
         <main class="container py-4">
+            {% for type, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ type == 'error' ? 'danger' : type }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            {% endfor %}
             {% block body %}{% endblock %}
         </main>
     </body>
