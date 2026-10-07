@@ -28,7 +28,7 @@ class Customer
 
     #[Assert\NotBlank]
     #[ORM\Column(type: 'phone_number', nullable: false)]
-	private PhoneNumber $phone;
+    private PhoneNumber $phone;
 
     public function __construct()
     {
@@ -54,6 +54,16 @@ class Customer
         return $this;
     }
 
+    public function getPhoneString(): string
+    {
+        if (!$this->getPhone()) {
+            return '';
+        }
+        $phoneUtil = PhoneNumberUtil::getInstance();
+
+        return $phoneUtil->format($this->getPhone(), PhoneNumberFormat::E164);
+    }
+
     public function getPhone(): PhoneNumber
     {
         return $this->phone;
@@ -66,25 +76,15 @@ class Customer
         return $this;
     }
 
-    public function getPhoneString(): string
-	{
-		if (!$this->getPhone()) {
-			return '';
-		}
-		$phoneUtil = PhoneNumberUtil::getInstance();
-
-		return $phoneUtil->format($this->getPhone(), PhoneNumberFormat::E164);
-	}
-
     public function setPhone1String(string $phone, string $country = 'US'): self
-	{
-		if (!$phone) {
-			return $this;
-		}
-		$phoneUtil = PhoneNumberUtil::getInstance();
-		/* @noinspection PhpUnhandledExceptionInspection */
-		$this->phone = $phoneUtil->parse($phone, $country);
+    {
+        if (!$phone) {
+            return $this;
+        }
+        $phoneUtil = PhoneNumberUtil::getInstance();
+        /* @noinspection PhpUnhandledExceptionInspection */
+        $this->phone = $phoneUtil->parse($phone, $country);
 
-		return $this;
-	}
+        return $this;
+    }
 }
