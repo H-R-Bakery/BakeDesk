@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All" type="PHPUnitRunConfigurationType" factoryName="PHPUnit">
+    <TestRunner configuration_file="$PROJECT_DIR$/phpunit.dist.xml" directory="$PROJECT_DIR$/tests" scope="XML" use_alternative_configuration_file="true" />
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="docker-compose.yaml: Compose Deployment" run_configuration_type="docker-deploy" />
+    </method>
+  </configuration>
+</component>

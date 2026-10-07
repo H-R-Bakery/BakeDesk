@@ -1514,6 +1514,30 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     default_cookie_lifetime?: int|Param, // Default lifetime of the cookie containing the JWT, in seconds. Defaults to the value of "framework.session.cookie_lifetime". // Default: null
  *     enable_profiler?: bool|Param, // Deprecated: The child node "enable_profiler" at path "mercure.enable_profiler" is deprecated. // Enable Symfony Web Profiler integration.
  * }
+ * @psalm-type MisdPhoneNumberConfig = array{
+ *     twig?: array{
+ *         enabled?: scalar|Param|null, // Default: true
+ *         default_region?: scalar|Param|null, // Default: "ZZ"
+ *         format?: \libphonenumber\PhoneNumberFormat::E164|\libphonenumber\PhoneNumberFormat::INTERNATIONAL|\libphonenumber\PhoneNumberFormat::NATIONAL|\libphonenumber\PhoneNumberFormat::RFC3966|Param, // Default: 0
+ *         ...<string, mixed>
+ *     },
+ *     form?: array{
+ *         enabled?: scalar|Param|null, // Default: true
+ *         ...<string, mixed>
+ *     },
+ *     serializer?: array{
+ *         enabled?: scalar|Param|null, // Default: true
+ *         default_region?: scalar|Param|null, // Default: "ZZ"
+ *         format?: \libphonenumber\PhoneNumberFormat::E164|\libphonenumber\PhoneNumberFormat::INTERNATIONAL|\libphonenumber\PhoneNumberFormat::NATIONAL|\libphonenumber\PhoneNumberFormat::RFC3966|Param, // Default: 0
+ *         ...<string, mixed>
+ *     },
+ *     validator?: array{
+ *         enabled?: scalar|Param|null, // Default: true
+ *         default_region?: scalar|Param|null, // Default: "ZZ"
+ *         format?: \libphonenumber\PhoneNumberFormat::E164|\libphonenumber\PhoneNumberFormat::INTERNATIONAL|\libphonenumber\PhoneNumberFormat::NATIONAL|\libphonenumber\PhoneNumberFormat::RFC3966|Param, // Default: 1
+ *         ...<string, mixed>
+ *     },
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1528,6 +1552,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     security?: SecurityConfig,
  *     monolog?: MonologConfig,
  *     mercure?: MercureConfig,
+ *     misd_phone_number?: MisdPhoneNumberConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1545,6 +1570,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         monolog?: MonologConfig,
  *         maker?: MakerConfig,
  *         mercure?: MercureConfig,
+ *         misd_phone_number?: MisdPhoneNumberConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
@@ -1560,6 +1586,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         security?: SecurityConfig,
  *         monolog?: MonologConfig,
  *         mercure?: MercureConfig,
+ *         misd_phone_number?: MisdPhoneNumberConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1576,6 +1603,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         security?: SecurityConfig,
  *         monolog?: MonologConfig,
  *         mercure?: MercureConfig,
+ *         misd_phone_number?: MisdPhoneNumberConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,
