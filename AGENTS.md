@@ -1,164 +1,245 @@
 # AGENTS.md
 
-This is a Symfony project. Check `composer.json` for the exact Symfony/PHP version
-in use, and read `symfony.lock` to see which recipes ran. Don't assume Doctrine,
-Twig, API Platform, Messenger, or Lock are installed unless one of those says so.
+## Project overview
 
-## Project architecture
+This project is **BakeDesk**, a local bakery order-management application.
 
-This project is BakeSlip, a local bakery order-management application.
+It replaces handwritten phone-order slips with a browser-based ordering system, production reports, customer history, and printed 4x6 order labels.
 
-Established decisions:
+The intended production host is a Raspberry Pi on the bakery's local network.
 
-- Symfony 8.1, kept on the latest stable Symfony release.
+Before changing code, inspect `composer.json`, `symfony.lock`, and the existing project configuration. Do not assume a Symfony component or third-party package is installed just because it would be useful.
+
+Use the versions actually installed by the project.
+
+---
+
+## Established architecture
+
+These architectural decisions have already been made. Do not replace them with alternatives unless explicitly requested.
+
+- Symfony 8.1+, kept current with the latest stable Symfony release.
 - PHP 8.4+.
-- Doctrine ORM with PostgreSQL.
-- Server-rendered Twig application with Stimulus/Turbo where useful.
+- Doctrine ORM.
+- PostgreSQL as the application database.
+- Server-rendered Twig pages.
+- Stimulus and Turbo where they improve the UI.
 - Redis for Symfony Messenger.
-- Mercure for realtime UI updates.
-- EasyAdmin will be used for the secured administration area.
-- Public ordering and production-report screens do not require authentication.
-- `/admin` requires authentication.
-- Printing is asynchronous through Messenger.
-- Printer configuration is stored in the database and uses IPP addresses.
-- Label and report printers are configurable; do not hard-code a printer model.
-- CUPS/IPP printing infrastructure must stay isolated behind a printer service abstraction.
-- Raspberry Pi is the intended production host.
-- Application services run with Docker Compose; hardware-facing CUPS runs on the host.
-- Use backed PHP enums for internal workflow/state values such as OrderStatus and PrintJobStatus. Do not use enums for admin-managed reference data such as Employee, ProductType, Unit, or Printer.
+- Mercure for realtime browser updates.
+- EasyAdmin for the secured administration area.
+- Docker Compose for application infrastructure.
+- Raspberry Pi as the intended production host.
+- Hardware-facing CUPS runs on the Raspberry Pi host rather than inside the application container.
+- Printers are accessed through IPP.
+- No printer vendor or model may be hard-coded into application logic.
 
-## Adding features: Flex, not hand-wiring
+The public ordering and production-report interfaces do not currently require authentication.
 
-Install new capabilities with `composer require <package>` (e.g. `symfony/lock`,
-`symfony/messenger`, `orm-pack`) and let the Flex recipe register the bundle and
-generate its config. Don't hand-edit `config/bundles.php` or hand-write a bundle's
-base config; that's what the recipe is for. Don't skip a good-fit component just
-because it isn't installed yet; installing it is one command.
+The `/admin` area must require authentication.
 
-## Conventions
+---
 
-Follow https://symfony.com/doc/current/best_practices.html to write idiomatic
-Symfony:
+## Core domain
 
-- Use PHP attributes for framework metadata, and not only on controllers:
-  `#[Route]`, `#[MapRequestPayload]`, `#[IsGranted]` on actions, `#[Assert\...]`
-  on properties, `#[AsCommand]`, `#[AsEventListener]`, `#[AsMessageHandler]`, and
-  `#[AsAlias]` / `#[AsTaggedItem]` / `#[Autoconfigure]` on services. No YAML or
-  XML routing.
-- Rely on autowiring and autoconfiguration. Type-hint constructor arguments and
-  let the container resolve them. Where a type-hint can't express it, stay in the
-  class with `#[Autowire]` (parameters, env vars, expressions) or `#[Target]` (one
-  of several implementations of an interface). A YAML service definition is the
-  last resort, not the first.
-- Controllers extend `AbstractController`, stay thin, and delegate to services.
-- Use the framework for what it already does: Form for server-rendered forms,
-  Validator for validation, Serializer for JSON, Messenger for async work,
-  Security (voters, authenticators) for access control, Twig `path()`/`url()`
-  instead of hardcoded URLs.
-- Before hand-writing infrastructure (locks, queues, caches, HTTP clients,
-  mailers, schedulers) or reaching for a third-party library, check whether a
-  Symfony component covers it. It usually does.
+The initial domain consists of:
 
-Three specifics worth spelling out, because they are easy to get wrong:
+- `Customer`
+- `Employee`
+- `Order`
+- `OrderItem`
+- `ProductType`
+- `Unit`
+- `Printer`
+- `PrintJob`
 
-- Bind request data with `#[MapRequestPayload]` / `#[MapQueryString]` on action
-  arguments, which wires up Serializer and Validator for you, instead of calling
-  `json_decode()` or `SerializerInterface` by hand. If neither package is
-  installed yet, `composer require` them rather than falling back to manual
-  parsing.
-- Use constructor property promotion, and `readonly` for DTOs and value objects.
-  Don't mark a service `readonly` if it might become `lazy: true`: a lazy proxy
-  can't extend a `readonly` class.
-- Use `symfony/lock` (`LockFactory`) for mutual exclusion. A hand-built flag or
-  lock file looks fine in review and is usually wrong under concurrency.
+Workflow/state concepts should use backed PHP enums where appropriate.
 
-## Everyday workflow
+Initial enums include:
 
-- Run the app with `symfony serve -d`, and commands with `symfony console ...`
-  (or `bin/console` when the Symfony CLI isn't available).
-- When something fails, read `var/log/dev.log` and the web profiler
-  (`/_profiler`) before changing code.
-- If `maker-bundle` is installed, prefer `bin/console make:*` with every argument
-  passed up front and `--no-interaction` where supported: makers prompt on a
-  terminal by default, which hangs a non-interactive shell. If a maker still
-  needs interactive input, hand-write the code instead.
-- If Doctrine ORM is installed, schema changes go through migrations
-  (`bin/console make:migration`, then `doctrine:migrations:migrate`), never
-  `doctrine:schema:update` or hand-written SQL.
-- `.env` is committed and holds defaults only. Real secrets belong in `.env.local`
-  (git-ignored) or the secrets vault (`bin/console secrets:set`), read via
-  `%env(...)%`.
+- `OrderStatus`
+- `PrintJobStatus`
+- `PrintDocumentType`
 
-## Testing
+Use PHP enums for internal workflow/state values.
 
-Install `symfony/test-pack` if it isn't already. Functional/HTTP tests extend
-`WebTestCase`; service-level tests extend `KernelTestCase`. Run
-`php bin/phpunit` (falls back to `vendor/bin/phpunit`). A feature isn't done
-until it has a test that exercises it the way a caller would, an HTTP request for
-a controller or a service call for a service, not just "it didn't throw."
+Do **not** use enums for administrator-managed reference data such as:
 
-## Code style
+- employees
+- product types
+- units
+- printers
 
-Symfony's coding standard, the `@Symfony` php-cs-fixer ruleset (a PSR-12-derived
-superset). Run `vendor/bin/php-cs-fixer fix` if `friendsofphp/php-cs-fixer` is
-installed; it isn't part of the skeleton by default.
+These must remain database entities so they can be managed without changing code.
 
-## Discover, don't guess
+---
 
-Framework APIs change between versions and your training data may be stale. Look
-things up in the project instead of relying on memory:
+## Entity identifiers
 
-- `bin/console about`: versions, environment, paths.
-- `bin/console debug:router`, `debug:container`, `debug:autowiring <name>`,
-  `debug:config <bundle>`, `config:dump-reference <bundle>`: what exists and how
-  it is configured.
-- `bin/console lint:container`, plus `lint:twig templates/` and
-  `lint:yaml config/` where those packages are installed: validate before running.
-- Read the installed source and docblocks under `vendor/`.
-- Docs: https://symfony.com/doc/current/ (switch to the version matching
-  `composer.json` if it differs).
+Use normal PostgreSQL integer/bigint identity primary keys for application entities.
 
-## Domain rules
+Do not introduce UUIDs unless a specific future requirement justifies them.
 
-Core entities planned for V1:
+Human-facing order numbers must be separate from database primary keys.
 
-- Customer
-- Employee
-- Order
-- OrderItem
-- ProductType
-- Unit
-- Printer
-- PrintJob
+For example:
 
-Order-entry rules:
+- database ID: internal identity
+- order number: value displayed to bakery staff and printed on labels
 
-- Employee selection is a small radio-button list.
-- The browser remembers the last selected employee locally.
-- Customer name/phone autocomplete existing customers.
-- Saving an order automatically creates a customer when no existing customer matches.
-- Front-counter users never explicitly create customers.
-- Customer phone numbers should be normalized for matching/search.
-- Orders preserve customer name/phone snapshots even when linked to a Customer.
-- Pickup is stored as a datetime.
-- Orders have human-readable order numbers.
-- Cancelled orders are retained rather than deleted.
+---
 
-Order item fields:
+## Customer behavior
 
-- Product type
-- Quantity
-- Unit
-- Description
+Customers are persistent records.
 
-Initial product types:
+Initial customer data includes at least:
+
+- name
+- phone number
+- normalized phone number
+- active state
+- created timestamp
+- updated timestamp
+
+Customer name and phone number must autocomplete during order entry.
+
+Autocomplete should search both:
+
+- customer name
+- normalized phone number
+
+Employees should never have to explicitly create a customer while taking an order.
+
+When an order is saved:
+
+1. Use the selected customer if one was chosen.
+2. Otherwise attempt to match an existing customer, primarily by normalized phone number.
+3. If no matching customer exists, automatically create one.
+4. Associate the order with that customer.
+
+Do not interrupt the front-counter order workflow with duplicate-customer management.
+
+Customer cleanup and future duplicate merging belong in the administration area.
+
+### Customer snapshots
+
+An order must preserve the customer information used when that order was created.
+
+The `Order` should therefore retain snapshot fields such as:
+
+- customer name
+- customer phone
+
+even when the order is associated with a `Customer` entity.
+
+Editing the customer record later must not rewrite historical orders.
+
+---
+
+## Employees
+
+There are currently only a small number of employees.
+
+Employee selection on the order-entry form should use radio buttons rather than autocomplete.
+
+The browser should remember the most recently selected employee using browser-local storage.
+
+This preference is browser-specific and is not an authenticated-user preference.
+
+If the previously remembered employee is inactive or no longer exists, it must not be automatically selected.
+
+Employees are administrator-managed entities.
+
+Likely initial fields include:
+
+- name
+- active
+- sort order
+- optional future external/Toast identifier
+
+Do not require employee authentication for order entry.
+
+The selected employee simply identifies who took the phone order.
+
+---
+
+## Orders
+
+Initial order information includes:
+
+- human-readable order number
+- associated customer
+- customer name snapshot
+- customer phone snapshot
+- employee who took the order
+- pickup datetime
+- order timestamp
+- paid boolean
+- order status
+- optional notes
+- created timestamp
+- updated timestamp
+
+Initial `OrderStatus` values are:
+
+- `OPEN`
+- `COMPLETED`
+- `CANCELLED`
+
+Cancelled orders must be retained.
+
+Do not delete an order merely because it was cancelled.
+
+Do not add additional workflow statuses such as baking, ready, packed, or picked-up unless explicitly requested.
+
+### Payments
+
+V1 is **not** a POS or payment-processing system.
+
+Do not add:
+
+- prices
+- subtotals
+- taxes
+- discounts
+- payment transactions
+- tender types
+- payment integrations
+
+The only payment-related field in V1 is a simple boolean indicating whether the order has been paid.
+
+Future Toast integration may change this, but it is outside the initial implementation.
+
+---
+
+## Order items
+
+Each order can contain multiple order items.
+
+An order item initially contains:
+
+- product type
+- quantity
+- unit
+- description
+- sort order if needed for preserving entry order
+
+Do not introduce a full Product/MenuItem entity in V1 unless explicitly requested.
+
+The description is intentionally free-form.
+
+### Initial product types
+
+Seed administrator-managed `ProductType` records for:
 
 - Donuts
 - Brownies
 - Cookies
 - Shape Cookies
 
-Initial units:
+### Initial units
+
+Seed administrator-managed `Unit` records for:
 
 - Each
 - Dozen
@@ -166,34 +247,555 @@ Initial units:
 - Tray
 - Box
 
-Production reports:
+Units must not be PHP enums because administrators may need to add or change them later.
 
-- Group by product type.
-- Do not normalize free-form descriptions in V1.
-- Show totals by identical unit where useful.
-- Reports can be downloaded or asynchronously printed to a configured report printer.
+Do not automatically convert units.
 
-Printing:
+For example:
 
-- Printers have a name, IPP address, active state, and capabilities such as labels/reports.
-- Printers are not tied to JADENS or any other vendor.
-- Labels are 4x6.
-- Saving an order must succeed independently of printing.
-- Print jobs are durable database entities.
-- Messenger messages should contain identifiers, not Doctrine entities.
-- Print status should be publishable through Mercure.
+- `12 Each`
+- `1 Dozen`
+
+remain separate quantities unless a future requirement explicitly adds normalization.
+
+---
+
+## Production reports
+
+Production reports are generated for a selected pickup date.
+
+V1 uses simple reporting rather than a normalized product catalog.
+
+Reports should:
+
+- group order items by product type
+- retain each item's free-form description
+- retain its entered unit
+- show useful totals for identical units within the same product type where practical
+
+Do not attempt to normalize free-form descriptions.
+
+For example, do not automatically combine:
+
+- `Glazed`
+- `glazed donuts`
+- `Plain Glazed`
+
+into one product.
+
+The production report tells bakers broadly how much of each product type must be produced.
+
+The printed order label tells packing staff how the individual customer's order must be assembled.
+
+Reports must be available for download.
+
+Reports may also be asynchronously sent to an IPP printer configured for report printing.
+
+---
+
+## Printers
+
+Printers are database-managed entities.
+
+Printers are not tied to a specific manufacturer or model.
+
+A printer should include, at minimum:
+
+- name
+- IPP address/URI
+- active state
+- whether it may print labels
+- whether it may print reports
+
+Additional configuration may be added later when demonstrated by an actual requirement.
+
+Do not hard-code:
+
+- JADENS
+- JD-668BT
+- CUPS queue names
+- IP addresses
+- development printers
+
+into domain or printing logic.
+
+The currently planned JADENS printer is only one possible configured printer.
+
+Development must be able to target another IPP printer.
+
+### Printer abstraction
+
+Printing infrastructure must be isolated behind an application service abstraction.
+
+Order controllers, report controllers, and Messenger handlers must not contain raw CUPS/IPP commands.
+
+Printing-related responsibilities should be separated so that another IPP implementation can be substituted later.
+
+---
+
+## Printing workflow
+
+All application-initiated printing is asynchronous.
+
+Saving an order and printing its label are separate operations.
+
+An order save must succeed even if printing fails.
+
+Expected flow:
+
+1. Validate the order.
+2. Persist the order and order items.
+3. Persist a `PrintJob` in the database.
+4. Commit the database transaction.
+5. Dispatch a Messenger message containing the print-job identifier.
+6. Return control to the browser.
+7. A Messenger worker processes the print job.
+8. The worker renders the document.
+9. The worker submits it to the configured IPP printer.
+10. Print status changes are persisted to PostgreSQL.
+11. Relevant status changes may be published through Mercure.
+
+Never put Doctrine entities directly into Messenger messages.
+
+Messenger messages should contain scalar identifiers, such as a `PrintJob` ID.
+
+---
+
+## Print jobs
+
+`PrintJob` is durable application state stored in PostgreSQL.
+
+Redis is only the queue transport and is not the source of truth for print history.
+
+A print job should retain enough information to diagnose a failed print attempt.
+
+Likely information includes:
+
+- associated printer
+- document type
+- status
+- associated order when applicable
+- report parameters when applicable
+- external CUPS/IPP job identifier when available
+- attempt count
+- created timestamp
+- started timestamp
+- submitted timestamp
+- completed timestamp
+- error information
+
+Initial `PrintDocumentType` values are:
+
+- `REPORT`
+- `LABEL`
+
+Initial `PrintJobStatus` values are:
+
+- `QUEUED`
+- `PROCESSING`
+- `SUBMITTED`
+- `COMPLETED`
+- `FAILED`
+- `CANCELLED`
+
+Meaning:
+
+- `QUEUED`: persisted and waiting for a Messenger worker
+- `PROCESSING`: worker is preparing/rendering the document
+- `SUBMITTED`: document was accepted by the printer/IPP subsystem
+- `COMPLETED`: printer subsystem reported successful completion
+- `FAILED`: processing or printing failed
+- `CANCELLED`: job was intentionally cancelled
+
+Do not assume every printer can reliably report physical print completion.
+
+For some printers, `SUBMITTED` may be the strongest reliable success indication.
+
+UI wording must not claim physical printing occurred unless the underlying printer status supports that claim.
+
+---
+
+## Messenger
+
+Use Symfony Messenger for asynchronous printing.
+
+Redis is the intended Messenger transport.
+
+Printing should have its own transport/queue.
+
+The print queue should initially use a single worker so jobs destined for physical printers are handled predictably and sequentially.
+
+Do not introduce RabbitMQ or another queue system unless specifically requested.
+
+Use Symfony's retry facilities rather than implementing hand-written retry loops.
+
+Retries for physical printing should remain conservative to avoid unexpected duplicate labels.
+
+Application-level `PrintJob` state remains authoritative even when Messenger retries occur.
+
+---
+
+## Mercure and realtime updates
+
+Mercure is used for realtime-ish browser updates.
+
+Potential realtime information includes:
+
+- queued print job
+- processing print job
+- submitted print job
+- completed print job
+- failed print job
+- future order/dashboard updates
+
+The database remains the source of truth.
+
+Mercure updates are notifications, not durable state.
+
+A browser that reconnects must be able to retrieve current state from Symfony/PostgreSQL.
+
+Do not require Mercure for basic order creation or reporting to function.
+
+---
+
+## Administration
+
+The administration area will use EasyAdmin.
+
+EasyAdmin is intended for management of data such as:
+
+- customers
+- employees
+- product types
+- units
+- printers
+- application configuration where appropriate
+
+The administration area must be authenticated.
+
+The normal order-entry and production-report interfaces are public on the bakery LAN for V1.
+
+Do not build the front-counter order workflow as EasyAdmin CRUD screens.
+
+Order entry should have a purpose-built interface optimized for speed and clarity.
+
+---
+
+## Interface conventions
+
+The primary application interface is server-rendered Twig.
+
+Use Symfony Forms for normal server-rendered form handling.
+
+Use Stimulus for targeted browser behavior such as:
+
+- employee local-storage preference
+- customer autocomplete
+- dynamic order-item rows
+- realtime status display
+
+Use Turbo where it provides a clear benefit.
+
+Do not introduce React, Vue, Angular, or a separate SPA/API frontend unless explicitly requested.
+
+Controllers must remain thin and delegate business logic to services.
+
+---
+
+## Symfony conventions
+
+Follow the Symfony best practices appropriate to the installed Symfony version.
+
+Prefer PHP attributes for framework metadata, including:
+
+- `#[Route]`
+- `#[IsGranted]`
+- `#[Assert\...]`
+- `#[AsCommand]`
+- `#[AsEventListener]`
+- `#[AsMessageHandler]`
+- `#[Autowire]`
+- related framework attributes where appropriate
+
+Do not add YAML/XML routing when PHP attribute routing is appropriate.
+
+Rely on autowiring and autoconfiguration.
+
+Type-hint constructor dependencies and allow the service container to resolve them.
+
+Use service configuration only when the dependency cannot reasonably be expressed through normal autowiring or Symfony attributes.
+
+Use Symfony components rather than hand-written infrastructure when Symfony already provides the capability.
+
+Examples:
+
+- Form for forms
+- Validator for validation
+- Security for authentication/authorization
+- Messenger for async work
+- Lock for mutual exclusion
+- HttpClient for HTTP integrations
+- Serializer for serialization
+- Mercure for realtime publishing
+
+Do not reinvent these facilities unnecessarily.
+
+---
+
+## Concurrency
+
+Assume multiple bakery users may submit or modify orders at approximately the same time.
+
+Do not rely on process-local flags or static variables for concurrency control.
+
+When actual mutual exclusion is required, use Symfony Lock.
+
+Printing must not block the HTTP request that saves an order.
+
+---
+
+## Doctrine conventions
+
+Use Doctrine ORM mappings with PHP attributes.
+
+Schema changes must use Doctrine migrations.
+
+Use:
+
+```bash
+php bin/console make:migration
+php bin/console doctrine:migrations:migrate
+```
+
+Do not use:
+
+```bash
+doctrine:schema:update
+```
+
+Do not hand-write production schema changes directly in PostgreSQL.
+
+Inspect generated migrations before considering them complete.
+
+Repositories should contain meaningful persistence/query logic.
+
+Do not create custom repository methods merely to wrap `find()`, `findAll()`, or other existing Doctrine functionality.
+
+---
+
+## Timestamps and timezones
+
+The application represents one bakery operating in one configured bakery timezone.
+
+Do not rely implicitly on the PHP, container, PostgreSQL, or operating-system timezone.
+
+Audit timestamps should be represented consistently.
+
+Pickup time is bakery-local business time and must be displayed accordingly.
+
+Avoid scattering timezone conversion logic throughout controllers and templates.
+
+---
+
+## Docker and production infrastructure
+
+Docker Compose is used for application infrastructure.
+
+Expected containerized services include, as applicable:
+
+- Symfony/PHP application
+- web server
+- Messenger worker
+- PostgreSQL
+- Redis
+- Mercure
+
+CUPS remains on the Raspberry Pi host because it is hardware-facing.
+
+Do not require USB printer devices inside normal application containers.
+
+Persistent application data must not depend on disposable container filesystems.
+
+Database and other persistent data require explicit persistent storage.
+
+---
+
+## Environment configuration
+
+`.env` contains committed defaults only.
+
+Do not put production secrets in `.env`.
+
+Use:
+
+- `.env.local`
+- environment variables
+- Symfony secrets
+
+for sensitive deployment-specific values.
+
+Do not hard-code deployment hostnames, credentials, printer addresses, or IP addresses into PHP source.
+
+---
+
+## Adding packages
+
+Prefer Composer and Symfony Flex.
+
+Use:
+
+```bash
+composer require ...
+```
+
+or:
+
+```bash
+composer require --dev ...
+```
+
+rather than manually wiring Symfony bundles.
+
+Allow Flex recipes to register bundles and generate configuration where appropriate.
+
+Do not manually edit `config/bundles.php` when a valid Flex recipe should perform that work.
+
+Before adding a third-party package, first check whether Symfony or PHP already provides an appropriate solution.
+
+Do not add packages speculatively.
+
+Add them when an actual implementation requires them.
+
+---
+
+## Coding style
+
+Use modern PHP appropriate to the configured PHP version.
+
+Prefer:
+
+- constructor property promotion
+- strict type declarations where consistent with the project
+- backed enums for workflow states
+- readonly DTOs/value objects where appropriate
+- typed properties
+- explicit return types
+
+Follow Symfony coding standards.
+
+If `friendsofphp/php-cs-fixer` is installed, use the `@Symfony` ruleset or the repository's configured rules.
+
+Do not introduce excessive abstractions without a demonstrated use case.
+
+Prefer simple services with clear responsibilities.
+
+---
+
+## Testing
+
+Features are not complete merely because they execute without throwing an exception.
+
+Add tests that exercise behavior from the appropriate caller's perspective.
+
+Use:
+
+- `WebTestCase` for HTTP/controller behavior
+- `KernelTestCase` for container-backed/service behavior
+- normal PHPUnit tests for isolated domain/value-object behavior
+
+Important business rules should have tests.
+
+Likely areas requiring tests include:
+
+- automatic customer matching/creation
+- customer snapshot behavior
+- order status rules
+- order-number generation
+- print-job creation
+- Messenger dispatch behavior
+- print-job state transitions
+- report grouping/totals
+- admin authorization
+
+Do not test framework internals.
+
+Test application behavior.
+
+---
+
+## Development workflow
+
+When possible, inspect the running project before guessing about framework configuration.
+
+Useful commands include:
+
+```bash
+php bin/console about
+php bin/console debug:router
+php bin/console debug:container
+php bin/console debug:autowiring
+php bin/console debug:config
+php bin/console config:dump-reference
+php bin/console lint:container
+php bin/console lint:twig templates/
+php bin/console lint:yaml config/
+```
+
+When something fails, inspect:
+
+- `var/log/dev.log`
+- Symfony profiler
+- actual service/container configuration
+- installed package source/docblocks when necessary
+
+Do not assume framework APIs from memory when the installed version can be inspected.
+
+If MakerBundle is installed, `make:*` commands may be used.
+
+For non-interactive automation, provide command arguments up front and use `--no-interaction` where supported.
+
+Do not start a command that will hang waiting for interactive input.
+
+---
 
 ## Definition of done
 
 Before considering a feature complete:
 
-1. Run relevant PHPUnit tests.
-2. Run `bin/console lint:container`.
-3. Run Twig/YAML linters when those files changed.
-4. Run PHPStan when installed.
-5. Run php-cs-fixer check when installed.
-6. For Doctrine model changes:
-   - generate a migration,
-   - inspect the migration,
-   - do not use `doctrine:schema:update`.
-7. Do not leave generated TODOs or placeholder implementations.
+1. Relevant PHPUnit tests pass.
+2. `php bin/console lint:container` passes.
+3. Twig lint passes when templates changed.
+4. YAML lint passes when YAML configuration changed.
+5. PHPStan passes when installed.
+6. php-cs-fixer check passes when installed.
+7. Doctrine model changes include an inspected migration.
+8. No `doctrine:schema:update` was used as the implementation mechanism.
+9. No generated TODOs, placeholder methods, dead code, or debugging output remain.
+10. Failure paths have been considered, especially around printing and asynchronous work.
+11. The implementation follows the established architecture instead of introducing an alternative stack.
+
+---
+
+## Scope discipline
+
+Do not turn BakeDesk into a general POS, inventory system, or online-ordering platform unless specifically requested.
+
+V1 intentionally excludes:
+
+- Toast integration
+- prices and monetary totals
+- payment processing
+- inventory management
+- online ordering
+- SMS notifications
+- email notifications
+- complex bakery-production workflow states
+- customer authentication
+- employee authentication for normal order entry
+- full product/menu catalog normalization
+
+The architecture should leave reasonable room for future expansion without implementing those features prematurely.
+
+When requirements are unclear, prefer the smallest implementation consistent with the established architecture and current task.
+
+Do not silently invent business rules.
