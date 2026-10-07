@@ -31,7 +31,10 @@
                 {% endfor %}
             </ul>
 
-            <a class="btn btn-primary" href="{{ path('order_new') }}">Enter another order</a>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary" href="{{ path('order_detail', {id: order.id}) }}">View order</a>
+                <a class="btn btn-outline-primary" href="{{ path('order_new') }}">Enter another order</a>
+            </div>
         </div>
     </div>
 {% endblock %}

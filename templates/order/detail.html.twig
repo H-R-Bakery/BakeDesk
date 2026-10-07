@@ -1,0 +1,60 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+
+{% block body %}
+    {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <p class="text-body-secondary mb-1"><a href="{{ path('order_index') }}">Orders</a></p>
+            <h1 class="h2 mb-0">Order {{ order.orderNumber }}</h1>
+        </div>
+        <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Customer</dt>
+                <dd class="col-sm-9">{{ order.customerName }}<br><span class="text-body-secondary">{{ order.customerPhone|phone_number_format('NATIONAL') }}</span></dd>
+                <dt class="col-sm-3">Pickup</dt>
+                <dd class="col-sm-9">{{ order.pickupAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
+                <dt class="col-sm-3">Taken by</dt>
+                <dd class="col-sm-9">{{ order.employee.name }}</dd>
+                <dt class="col-sm-3">Ordered at</dt>
+                <dd class="col-sm-9">{{ order.orderedAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
+                <dt class="col-sm-3">Payment</dt>
+                <dd class="col-sm-9"><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></dd>
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9"><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></dd>
+                {% if order.notes %}
+                    <dt class="col-sm-3">Notes</dt>
+                    <dd class="col-sm-9">{{ order.notes }}</dd>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h2 class="h5">Items</h2>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr><th>Quantity</th><th>Unit</th><th>Product type</th><th>Description</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order.items %}
+                            <tr>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit.name }}</td>
+                                <td>{{ item.productType.name }}</td>
+                                <td>{{ item.description }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

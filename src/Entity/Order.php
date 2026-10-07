@@ -70,6 +70,7 @@ class Order
      * @var Collection<int, OrderItem>
      */
     #[ORM\OneToMany(mappedBy: 'order', targetEntity: OrderItem::class, cascade: ['persist'], orphanRemoval: true)]
+    #[ORM\OrderBy(['sortOrder' => 'ASC', 'id' => 'ASC'])]
     private Collection $items;
 
     public function __construct()

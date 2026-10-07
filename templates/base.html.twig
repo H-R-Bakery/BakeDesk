@@ -22,6 +22,10 @@
         <nav class="navbar navbar-dark bg-primary shadow-sm" aria-label="Main navigation">
             <div class="container">
                 <a class="navbar-brand fw-semibold" href="{{ path('order_new') }}">BakeDesk</a>
+                <div class="navbar-nav flex-row gap-3">
+                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_new' ? ' active' : '' }}" href="{{ path('order_new') }}">New Order</a>
+                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_' and app.request.attributes.get('_route') != 'order_new' ? ' active' : '' }}" href="{{ path('order_index') }}">Orders</a>
+                </div>
             </div>
         </nav>
         <main class="container py-4">

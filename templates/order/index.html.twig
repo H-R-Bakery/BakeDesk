@@ -1,0 +1,111 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Orders | BakeDesk{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+{% endblock %}
+
+{% block body %}
+    {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="h2 mb-1">Orders</h1>
+            <p class="text-body-secondary mb-0">{{ is_default_upcoming ? 'Upcoming open orders' : 'Search order history' }}</p>
+        </div>
+        <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
+    </div>
+
+    <form method="get" action="{{ path('order_index') }}" class="card card-body shadow-sm mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-lg-5">
+                <label class="form-label" for="order-search">Search</label>
+                <input class="form-control" id="order-search" type="search" name="q" value="{{ query }}" placeholder="Order number, customer, or phone">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-2">
+                <label class="form-label" for="pickup-date">Pickup date</label>
+                <input class="form-control" id="pickup-date" type="date" name="pickupDate" value="{{ pickup_date }}">
+            </div>
+            <div class="col-12 col-sm-6 col-lg-2">
+                <label class="form-label" for="order-status">Status</label>
+                <select class="form-select" id="order-status" name="status">
+                    <option value="all"{{ status == 'all' or status == '' ? ' selected' : '' }}>All statuses</option>
+                    {% for value, label in status_labels %}
+                        <option value="{{ value }}"{{ status == value ? ' selected' : '' }}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-2">
+                <label class="form-label" for="order-employee">Taken by</label>
+                <select class="form-select" id="order-employee" name="employee">
+                    <option value="">All employees</option>
+                    {% for employee in employees %}
+                        <option value="{{ employee.id }}"{{ employee_id == employee.id ? ' selected' : '' }}>{{ employee.name }}{% if not employee.active %} (inactive){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-lg-1 d-flex gap-2">
+                <button class="btn btn-primary flex-grow-1" type="submit">Search</button>
+                {% if not is_default_upcoming %}
+                    <a class="btn btn-outline-secondary" href="{{ path('order_index') }}">Clear</a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+
+    {% if rows is empty %}
+        <div class="card shadow-sm">
+            <div class="card-body text-center py-5">
+                <p class="h5 mb-3">{{ is_default_upcoming ? 'No upcoming orders found.' : 'No orders matched your search.' }}</p>
+                <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="table-responsive shadow-sm rounded">
+            <table id="orders-table" class="table table-striped table-hover align-middle mb-0"
+                   data-toggle="table" data-sortable="true" data-search="false" data-pagination="false"
+                   data-mobile-responsive="true" data-classes="table table-striped table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th data-field="order-number" data-sortable="true">Order #</th>
+                        <th data-field="pickup" data-sortable="true">Pickup</th>
+                        <th data-field="customer" data-sortable="true">Customer</th>
+                        <th data-field="phone">Phone</th>
+                        <th data-field="employee" data-sortable="true">Taken by</th>
+                        <th data-field="items" data-sortable="true">Items</th>
+                        <th data-field="paid">Paid</th>
+                        <th data-field="status" data-sortable="true">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        {% set order = row.order %}
+                        <tr>
+                            <td data-sort-value="{{ order.orderNumber }}"><a class="fw-semibold" href="{{ path('order_detail', {id: order.id}) }}">{{ order.orderNumber }}</a></td>
+                            <td data-sort-value="{{ order.pickupAt|date('Y-m-d H:i:s', bakery_timezone) }}"><span class="d-block">{{ order.pickupAt|date('D, M j', bakery_timezone) }}</span><span class="text-body-secondary">{{ order.pickupAt|date('g:i A', bakery_timezone) }}</span></td>
+                            <td>{{ order.customerName }}</td>
+                            <td>{{ order.customerPhone|phone_number_format('NATIONAL') }}</td>
+                            <td>{{ order.employee.name }}</td>
+                            <td>{{ row.itemCount }} item{{ row.itemCount == 1 ? '' : 's' }}</td>
+                            <td><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></td>
+                            <td><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if total_pages > 1 %}
+            <nav class="mt-3" aria-label="Order pages">
+                <ul class="pagination justify-content-center">
+                    {% for page_number in 1..total_pages %}
+                        <li class="page-item{{ page_number == page ? ' active' : '' }}">
+                            <a class="page-link" href="{{ path('order_index', app.request.query.all|merge({page: page_number})) }}">{{ page_number }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </nav>
+        {% endif %}
+        <p class="small text-body-secondary mt-2">Showing {{ (page - 1) * page_size + 1 }}–{{ min(page * page_size, total) }} of {{ total }} order{{ total == 1 ? '' : 's' }}.</p>
+    {% endif %}
+{% endblock %}

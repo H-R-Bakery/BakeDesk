@@ -30,4 +30,7 @@ return [
     'bootstrap' => ['version' => '5.3.8'],
     '@popperjs/core' => ['version' => '2.11.8'],
     'bootstrap/dist/css/bootstrap.min.css' => ['version' => '5.3.8', 'type' => 'css'],
+    'bootstrap-table' => ['version' => '1.25.0'],
+    'bootstrap-table/dist/bootstrap-table.min.css' => ['version' => '1.25.0', 'type' => 'css'],
+    'jquery' => ['version' => '3.7.1'],
 ];

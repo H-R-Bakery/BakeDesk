@@ -16,7 +16,7 @@ final class OrderNumberGeneratorTest extends TestCase
         $connection
             ->expects(self::exactly(3))
             ->method('fetchOne')
-            ->with("SELECT nextval('bakery_order_number_seq')")
+            ->with("SELECT nextval('public.bakery_order_number_seq'::regclass)")
             ->willReturnOnConsecutiveCalls('1000', '1001', '1002');
 
         $generator = new OrderNumberGenerator($connection);
