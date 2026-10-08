@@ -13,9 +13,9 @@ services:
       retries: 5
       start_period: 60s
     volumes:
-#      - database_data:/var/lib/postgresql/data:rw
+      #      - database_data:/var/lib/postgresql/data:rw
       # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-       - $PWD/docker/db/data:/var/lib/postgresql:rw
+      - $PWD/docker/db/data:/var/lib/postgresql:rw
     ports:
       - "5432:5432"
   ###< doctrine/doctrine-bundle ###
@@ -28,7 +28,7 @@ services:
       timeout: 5s
       retries: 5
 
-###> symfony/mercure-bundle ###
+  ###> symfony/mercure-bundle ###
   mercure:
     image: dunglas/mercure
     restart: unless-stopped
@@ -41,7 +41,7 @@ services:
       MERCURE_EXTRA_DIRECTIVES: |
         cors_origins http://127.0.0.1:8000
     # Comment the following line to disable the development mode
-#    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
+    #    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
     healthcheck:
       test:
         [
@@ -60,8 +60,17 @@ services:
     ports:
       - "3000:80"
 
-###< symfony/mercure-bundle ###
-#volumes:
+  gotenberg:
+    build: docker/gotenberg
+    ports:
+      - "18833:8833"
+    command:
+      - "gotenberg"
+      #            - "--log-level=debug"
+      - "--api-port=8833"
+
+  ###< symfony/mercure-bundle ###
+  #volumes:
   ###> doctrine/doctrine-bundle ###
 #  database_data:
 ###< doctrine/doctrine-bundle ###
