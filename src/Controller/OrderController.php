@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Application\Document\OrderLabelRenderer;
+use App\Application\Document\OrderLabelRenderingException;
 use App\Application\Order\BakeryClock;
 use App\Application\Order\NewOrderInputFactory;
 use App\Application\Order\OrderCanceller;
@@ -19,7 +21,9 @@ use App\Repository\OrderRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class OrderController extends AbstractController
@@ -101,6 +105,30 @@ final class OrderController extends AbstractController
             'order' => $order,
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
+    }
+
+    #[Route('/orders/{id<\d+>}/label', name: 'order_label', methods: ['GET'])]
+    public function label(int $id, OrderRepository $orderRepository, OrderLabelRenderer $orderLabelRenderer): Response
+    {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $document = $orderLabelRenderer->render($order);
+        } catch (OrderLabelRenderingException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'The label preview is temporarily unavailable.', $exception);
+        }
+
+        $response = new Response($document->getContents());
+        $response->headers->set('Content-Type', $document->mimeType);
+        $response->headers->set('Content-Disposition', $response->headers->makeDisposition(
+            ResponseHeaderBag::DISPOSITION_INLINE,
+            $document->filename,
+        ));
+
+        return $response;
     }
 
     #[Route('/orders/{id<\d+>}/edit', name: 'order_edit', methods: ['GET', 'POST'])]

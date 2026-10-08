@@ -331,6 +331,12 @@ Order controllers, report controllers, and Messenger handlers must not contain r
 
 Printing-related responsibilities should be separated so that another IPP implementation can be substituted later.
 
+### Label document rendering and storage
+
+Gotenberg 8 is the application PDF rendering service for HTML documents, using the official `gotenberg/gotenberg-php` client.
+
+Generated documents are private application artifacts stored through `league/flysystem-bundle`; application code must use the Flysystem abstraction rather than depending on local filesystem paths.
+
 ---
 
 ## Printing workflow

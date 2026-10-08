@@ -10,6 +10,7 @@
             <h1 class="h2 mb-0">Order {{ order.orderNumber }}</h1>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-outline-secondary" href="{{ path('order_label', {id: order.id}) }}" target="_blank" rel="noopener">Preview label (4×6 PDF)</a>
             {% if order.status.value == 'open' %}
                 <a class="btn btn-outline-primary" href="{{ path('order_edit', {id: order.id}) }}">Edit order</a>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-order-modal">

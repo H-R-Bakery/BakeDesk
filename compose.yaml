@@ -61,13 +61,23 @@ services:
       - "3000:80"
 
   gotenberg:
-    build: docker/gotenberg
-    ports:
-      - "18833:8833"
+    image: gotenberg/gotenberg:8-chromium
+    restart: unless-stopped
     command:
       - "gotenberg"
       #            - "--log-level=debug"
       - "--api-port=8833"
+    expose:
+      - "8833"
+    # Host access is bound to loopback for local preview only. Containerized
+    # applications should use http://gotenberg:8833 over the Compose network.
+    ports:
+      - "127.0.0.1:${GOTENBERG_PORT:-18833}:8833"
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8833/health" ]
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   ###< symfony/mercure-bundle ###
   #volumes:

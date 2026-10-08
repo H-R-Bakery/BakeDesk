@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Application\Document\DocumentRendererInterface;
 use App\Application\Order\OrderNumberGenerator;
 use App\Entity\Customer;
 use App\Entity\Employee;
@@ -377,6 +378,36 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
         $this->client->request('GET', '/orders/'.$cancelled->getId().'/edit');
         self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testLabelPreviewReturnsStoredPdfWithoutCreatingPrintJob(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Preview Customer', '+18125551234');
+        $order = $this->createOrder('3010', $employee, $productType, $unit, $customer);
+        self::getContainer()->set(DocumentRendererInterface::class, new class implements DocumentRendererInterface {
+            public function renderHtmlToPdf(string $html): string
+            {
+                return '%PDF-1.7 preview';
+            }
+        });
+
+        $this->client->request('GET', '/orders/'.$order->getId().'/label');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $this->client->getResponse()->headers->get('Content-Type'));
+        self::assertSame('inline; filename=order-3010-', substr((string) $this->client->getResponse()->headers->get('Content-Disposition'), 0, 28));
+        self::assertStringStartsWith('%PDF-', (string) $this->client->getResponse()->getContent());
+        self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
+    }
+
+    public function testUnknownOrderLabelReturnsNotFound(): void
+    {
+        $this->client->request('GET', '/orders/999/label');
+
+        self::assertResponseStatusCodeSame(404);
     }
 
     private function submitOrder(Employee $employee, ProductType $productType, Unit $unit, string $name, string $phone, int $orderNumber): void
