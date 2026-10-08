@@ -10,11 +10,14 @@ final class BakeryClock
 {
     private \DateTimeZone $timezone;
 
+    private \DateTimeZone $utcTimezone;
+
     public function __construct(
         #[Autowire('%bakery_timezone%')]
         string $timezone,
     ) {
         $this->timezone = new \DateTimeZone($timezone);
+        $this->utcTimezone = new \DateTimeZone('UTC');
     }
 
     public function now(): \DateTimeImmutable
@@ -38,10 +41,10 @@ final class BakeryClock
 
     public function combineDateAndTime(\DateTimeImmutable $date, \DateTimeImmutable $time): \DateTimeImmutable
     {
-        return new \DateTimeImmutable(
-            $date->format('Y-m-d').' '.$time->format('H:i:s'),
+        return (new \DateTimeImmutable(
+            $date->setTimezone($this->timezone)->format('Y-m-d').' '.$time->setTimezone($this->timezone)->format('H:i:s'),
             $this->timezone,
-        );
+        ))->setTimezone($this->utcTimezone);
     }
 
     public function getTimezoneName(): string

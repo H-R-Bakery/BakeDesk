@@ -155,7 +155,7 @@ class Order
 
     public function setPickupAt(\DateTimeImmutable $pickupAt): static
     {
-        $this->pickupAt = $pickupAt;
+        $this->pickupAt = $pickupAt->setTimezone(new \DateTimeZone('UTC'));
 
         return $this;
     }
@@ -167,7 +167,7 @@ class Order
 
     public function setOrderedAt(\DateTimeImmutable $orderedAt): static
     {
-        $this->orderedAt = $orderedAt;
+        $this->orderedAt = $orderedAt->setTimezone(new \DateTimeZone('UTC'));
 
         return $this;
     }

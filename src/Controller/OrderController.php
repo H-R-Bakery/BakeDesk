@@ -318,6 +318,6 @@ final class OrderController extends AbstractController
             return null;
         }
 
-        return $date;
+        return $date->setTimezone(new \DateTimeZone('UTC'));
     }
 }

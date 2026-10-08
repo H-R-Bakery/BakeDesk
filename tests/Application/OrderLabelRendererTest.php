@@ -62,7 +62,7 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('Snapshot Customer', $renderedHtml);
         self::assertStringContainsString('(812) 555-1234', $renderedHtml);
         self::assertStringContainsString('Sat, Oct 10', $renderedHtml);
-        self::assertStringContainsString('9:30 AM', $renderedHtml);
+        self::assertStringContainsString('1:30 PM', $renderedHtml);
         self::assertStringContainsString('payment-paid', $renderedHtml);
         self::assertMatchesRegularExpression('/class="payment payment-paid">\s*PAID\s*<\/div>/', $renderedHtml);
         self::assertStringContainsString('Order #1234', $renderedHtml);

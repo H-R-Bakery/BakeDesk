@@ -151,8 +151,8 @@ final class OrderCreatorTest extends TestCase
         $this->entityManager->persist($unit);
         $this->entityManager->flush();
 
-        $pickupAt = new \DateTimeImmutable('2026-10-10 09:30:00');
-        $orderedAt = new \DateTimeImmutable('2026-10-07 14:15:00');
+        $pickupAt = new \DateTimeImmutable('2026-10-10 09:30:00')->setTimezone(new \DateTimeZone('UTC'));
+        $orderedAt = new \DateTimeImmutable('2026-10-07 14:15:00')->setTimezone(new \DateTimeZone('UTC'));
         $order = $this->orderCreator->create(new OrderInput(
             customerName: 'Jamie Baker',
             customerPhone: $this->phone('+18125551238'),
@@ -168,8 +168,8 @@ final class OrderCreatorTest extends TestCase
         ));
 
         self::assertSame($employee, $order->getEmployee());
-        self::assertSame($pickupAt, $order->getPickupAt());
-        self::assertSame($orderedAt, $order->getOrderedAt());
+        self::assertEquals($pickupAt, $order->getPickupAt());
+        self::assertEquals($orderedAt, $order->getOrderedAt());
         self::assertSame('1000', $order->getOrderNumber());
         self::assertTrue($order->isPaid());
         self::assertSame('Call when ready', $order->getNotes());

@@ -145,7 +145,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($order->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
         self::assertSame($employee->getId(), $order->getEmployee()?->getId());
         self::assertSame('2000', $order->getOrderNumber());
-        self::assertSame('2026-10-10 09:30:00', $order->getPickupAt()?->format('Y-m-d H:i:s'));
+        self::assertSame('2026-10-10 13:30:00', $order->getPickupAt()?->format('Y-m-d H:i:s'));
         self::assertTrue($order->isPaid());
         self::assertSame('Call when ready', $order->getNotes());
         self::assertCount(2, $order->getItems());
@@ -312,7 +312,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('Updated Customer', $updatedOrder->getCustomerName());
         self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($updatedOrder->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
         self::assertSame($replacementEmployee->getId(), $updatedOrder->getEmployee()?->getId());
-        self::assertSame('2026-10-12 14:45:00', $updatedOrder->getPickupAt()?->format('Y-m-d H:i:s'));
+        self::assertSame('2026-10-12 18:45:00', $updatedOrder->getPickupAt()?->format('Y-m-d H:i:s'));
         self::assertTrue($updatedOrder->isPaid());
         self::assertSame('Updated notes', $updatedOrder->getNotes());
     }
