@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Application\Packaging;
 
 use App\Application\Packaging\FractionalPackageUnit;
-use App\Application\Packaging\MissingPackagingRule;
 use App\Application\Packaging\PackageCalculator;
 use App\Entity\Customer;
 use App\Entity\Order;
@@ -105,26 +104,36 @@ final class PackageCalculatorTest extends KernelTestCase
         self::assertSame(['24', '24', '2'], array_map(static fn ($allocation): string => $allocation->quantity, $allocations));
     }
 
-    public function testMissingRuleFailsWithProductAndUnitContext(): void
+    public function testMissingRuleTreatsTheEntireItemAsOnePackage(): void
     {
-        $item = $this->item('Brownies', 'Each', '1');
+        $allocations = $this->calculator->calculate($this->item('Brownies', 'Each', '24'));
 
-        try {
-            $this->calculator->calculate($item);
-            self::fail('A missing packaging rule should fail.');
-        } catch (MissingPackagingRule $exception) {
-            self::assertStringContainsString('Brownies / Each', $exception->getMessage());
-        }
+        self::assertCount(1, $allocations);
+        self::assertSame('24', $allocations[0]->quantity);
+        self::assertSame(1, $allocations[0]->packageNumber);
+        self::assertSame(1, $allocations[0]->packageCount);
     }
 
-    public function testInactiveRuleIsNotUsed(): void
+    public function testLargeQuantityWithoutRuleStillCreatesOnePackage(): void
+    {
+        $allocations = $this->calculator->calculate($this->item('Brownies', 'Each', '100'));
+
+        self::assertCount(1, $allocations);
+        self::assertSame('100', $allocations[0]->quantity);
+        self::assertSame(1, $allocations[0]->packageCount);
+    }
+
+    public function testInactiveRuleFallsBackToOnePackage(): void
     {
         $item = $this->item('Cookies', 'Each', '24');
         $this->rule($item, '24')->setActive(false);
         $this->entityManager->flush();
 
-        $this->expectException(MissingPackagingRule::class);
-        $this->calculator->calculate($item);
+        $allocations = $this->calculator->calculate($item);
+
+        self::assertCount(1, $allocations);
+        self::assertSame('24', $allocations[0]->quantity);
+        self::assertSame(1, $allocations[0]->packageCount);
     }
 
     private function item(string $productName, string $unitName, string $quantity, bool $packageUnit = false): OrderItem

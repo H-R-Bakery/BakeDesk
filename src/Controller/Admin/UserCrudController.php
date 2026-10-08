@@ -25,9 +25,10 @@ final class UserCrudController extends ReferenceCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        //todo-evo: Finish the user crud controller
+        yield TextField::new('email', 'Email');
         yield TextField::new('name', 'Name');
         yield BooleanField::new('active', 'Active');
         yield IntegerField::new('sortOrder', 'Sort order')->setHelp('Lower values appear first when employees are selected for an order.');
+        yield TextField::new('plainPassword', 'Password')->setHelp('Leave blank to keep the current password.');
     }
 }

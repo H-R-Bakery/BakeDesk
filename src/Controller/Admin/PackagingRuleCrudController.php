@@ -10,7 +10,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
 /** @extends ReferenceCrudController<PackagingRule> */
 final class PackagingRuleCrudController extends ReferenceCrudController
@@ -33,7 +32,7 @@ final class PackagingRuleCrudController extends ReferenceCrudController
         yield NumberField::new('quantityPerPackage', 'Quantity per package')
             ->setNumDecimals(2)
             ->setStoredAsString(true)
-            ->setHelp('Used when the selected Unit is not a package unit. Example: 24 Each Cookies per physical box.');
+            ->setHelp('Optional. Defines how many of this Product Type and Unit fit in one physical package. If no active rule exists, the entire order item is treated as one package.');
         yield BooleanField::new('active', 'Active');
     }
 }

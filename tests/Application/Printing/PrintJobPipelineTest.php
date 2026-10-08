@@ -566,7 +566,7 @@ final class PrintJobPipelineTest extends KernelTestCase
     {
         $phone = PhoneNumberUtil::getInstance()->parse('+18125551234', 'US');
         $customer = (new Customer())->setName('Snapshot Customer')->setPhone($phone);
-        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
+        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true)->setPlainPassword('test-password');
         $productType = (new ProductType())->setName('Donuts');
         $unit = (new Unit())->setName('Dozen')->setPackageUnit(true);
         $this->entityManager->persist($customer);

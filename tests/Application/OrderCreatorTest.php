@@ -147,7 +147,7 @@ final class OrderCreatorTest extends TestCase
 
     public function testOrderFieldsAndItemsArePopulatedThroughEntityApis(): void
     {
-        $user = User::new(email: 'mb@example.com', name: 'Morgan Baker', employee: true);
+        $user = User::new(email: 'mb@example.com', name: 'Morgan Baker', employee: true)->setPassword('test-password');
         $productType = (new ProductType())->setName('Donuts');
         $unit = (new Unit())->setName('Dozen');
         $this->entityManager->persist($user);
@@ -242,7 +242,7 @@ final class OrderCreatorTest extends TestCase
     {
         $user = $this->userRepository->findOneBy(['email' => 'ce@example.com']);
         if (!$user) {
-            $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
+            $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true)->setPassword('test-password');
             $this->entityManager->persist($user);
             $this->entityManager->flush();
         }

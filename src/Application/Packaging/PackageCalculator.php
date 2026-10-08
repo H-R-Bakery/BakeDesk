@@ -53,7 +53,13 @@ final class PackageCalculator
 
         $rule = $this->packagingRuleRepository->findActiveFor($productType, $unit);
         if (null === $rule) {
-            throw MissingPackagingRule::forProductAndUnit($productType, $unit);
+            return [new PackageAllocation(
+                orderItem: $orderItem,
+                packageNumber: 1,
+                packageCount: 1,
+                quantity: $this->fromMinorUnits($quantity),
+                unit: $unit,
+            )];
         }
         if (null === $rule->getUnit() || $rule->getUnit()->isPackageUnit()) {
             throw new InvalidPackagingQuantity(sprintf('The packaging rule for %s / %s must use a non-package unit.', $productType->getName(), $unit->getName()));

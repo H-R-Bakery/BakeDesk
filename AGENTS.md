@@ -112,7 +112,7 @@ Autocomplete should search both:
 - customer name
 - normalized phone number
 
-Employees should never have to explicitly create a customer while taking an order.
+Order takers should never have to explicitly create a customer while taking an order.
 
 When an order is saved:
 
@@ -140,21 +140,23 @@ Editing the customer record later must not rewrite historical orders.
 
 ---
 
-## Employees
+## Order takers
 
-There are currently only a small number of employees.
+Order takers are eligible `User` records. There is no separate Employee entity.
 
-Employee selection on the order-entry form should use radio buttons rather than autocomplete.
+There are currently only a small number of order takers.
 
-The browser should remember the most recently selected employee using browser-local storage.
+Order-taker selection on the order-entry form should use radio buttons rather than autocomplete.
+
+The browser should remember the most recently selected order taker using browser-local storage.
 
 This preference is browser-specific and is not an authenticated-user preference.
 
-If the previously remembered employee is inactive or no longer exists, it must not be automatically selected.
+If the previously remembered order taker is inactive or no longer exists, it must not be automatically selected.
 
-Do not require employee authentication for order entry.
+Do not require user authentication for order entry.
 
-The selected employee simply identifies who took the phone order.
+The selected User simply identifies who took the phone order.
 
 ---
 
@@ -166,7 +168,7 @@ Initial order information includes:
 - associated customer
 - customer name snapshot
 - customer phone snapshot
-- employee who took the order
+- User who took the order
 - pickup datetime
 - order timestamp
 - paid boolean
@@ -259,11 +261,15 @@ Labels represent physical packages or boxes, not entire Orders. A Unit marked
 `isPackageUnit` represents one physical package per whole unit; this behavior
 must come from the database flag rather than hard-coded unit names.
 
-Non-package Units require an active `PackagingRule` for the ProductType and
-Unit before labels can be queued. Missing rules must be reported and must never
-be guessed. Package arithmetic must be decimal-safe and must not use PHP binary
-floating point. A fractional quantity for a package Unit is a focused
-packaging error; use a separate configurable Unit such as `Half Dozen` instead.
+`PackagingRule` records are optional. A rule means: “When this ProductType is
+ordered using this Unit, split the quantity into packages of this capacity.”
+Package Units create one package per whole Unit quantity. Non-package Units with
+an active rule are split according to that rule. Non-package Units without an
+active rule default to one package containing the entire OrderItem quantity.
+Missing PackagingRules must never prevent label creation. Package arithmetic
+must be decimal-safe and must not use PHP binary floating point. A fractional
+quantity for a package Unit is a focused packaging error; use a separate
+configurable Unit such as `Half Dozen` instead.
 
 ---
 
@@ -496,7 +502,7 @@ The administration area will use EasyAdmin.
 EasyAdmin is intended for management of data such as:
 
 - customers
-- employees
+- users eligible to take orders
 - product types
 - units
 - printers
@@ -520,7 +526,7 @@ Use Symfony Forms for normal server-rendered form handling.
 
 Use Stimulus for targeted browser behavior such as:
 
-- employee local-storage preference
+- order-taker local-storage preference
 - customer autocomplete
 - dynamic order-item rows
 - realtime status display
@@ -822,7 +828,7 @@ V1 intentionally excludes:
 - email notifications
 - complex bakery-production workflow states
 - customer authentication
-- employee authentication for normal order entry
+- user authentication for normal order entry
 - full product/menu catalog normalization
 
 The architecture should leave reasonable room for future expansion without implementing those features prematurely.

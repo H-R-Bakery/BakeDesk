@@ -202,12 +202,14 @@ final class OrderControllerTest extends WebTestCase
         );
     }
 
-    public function testMissingPackagingRuleLeavesOrderSavedWithoutPartialLabelJobs(): void
+    public function testMissingPackagingRuleFallsBackToOneLabelAndKeepsPackageUnitLabels(): void
     {
         [$user] = $this->createUsers();
-        [$productType] = $this->createProductTypes();
+        [$donuts] = $this->createProductTypes();
+        $brownies = (new ProductType())->setName('Brownies')->setActive(true);
         $dozen = (new Unit())->setName('Dozen')->setPackageUnit(true)->setActive(true);
         $each = (new Unit())->setName('Each')->setPackageUnit(false)->setActive(true);
+        $this->entityManager->persist($brownies);
         $this->entityManager->persist($dozen);
         $this->entityManager->persist($each);
         $this->entityManager->persist((new Printer())
@@ -219,31 +221,36 @@ final class OrderControllerTest extends WebTestCase
 
         $crawler = $this->client->request('GET', '/order/new');
         $form = $crawler->selectButton('Save order')->form([
-            'new_order[customerName]' => 'Packaging Failure Customer',
+            'new_order[customerName]' => 'Packaging Fallback Customer',
             'new_order[customerPhone]' => '8125551234',
             'new_order[user]' => (string) $user->getId(),
             'new_order[pickupDate]' => '2026-10-10',
             'new_order[pickupTime]' => '09:30',
-            'new_order[items][0][productType]' => (string) $productType->getId(),
-            'new_order[items][0][quantity]' => '1',
+            'new_order[items][0][productType]' => (string) $donuts->getId(),
+            'new_order[items][0][quantity]' => '2',
             'new_order[items][0][unit]' => (string) $dozen->getId(),
             'new_order[items][0][description]' => 'Glazed',
         ]);
         $values = $form->getPhpValues();
         $values['new_order']['items'][1] = [
-            'productType' => (string) $productType->getId(),
-            'quantity' => '30',
+            'productType' => (string) $brownies->getId(),
+            'quantity' => '24',
             'unit' => (string) $each->getId(),
-            'description' => 'Chocolate',
+            'description' => 'Chocolate Frosted',
         ];
 
         $this->client->request('POST', '/order/new', $values);
         self::assertResponseRedirects('/order/1/created');
+        self::assertCount(3, self::getContainer()->get('messenger.transport.print')->getSent());
         $this->client->followRedirect();
 
-        self::assertSelectorTextContains('.alert-warning', 'No active packaging rule exists for Donuts / Each');
+        self::assertSelectorTextContains('.alert-success', 'Label queued.');
+        self::assertSelectorNotExists('.alert-warning');
         self::assertSame(1, $this->entityManager->getRepository(Order::class)->count([]));
-        self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertSame(3, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        $printJobs = $this->entityManager->getRepository(PrintJob::class)->findBy([], ['id' => 'ASC']);
+        self::assertSame(['1', '1', '24'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $printJobs));
+        self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
     }
 
     public function testExistingCustomerIsReusedAndNewCustomerIsCreatedWhenNeeded(): void
@@ -527,8 +534,8 @@ final class OrderControllerTest extends WebTestCase
     /** @return array{User, User} */
     private function createUsers(): array
     {
-        $active = User::new(email: 'ae@example.com', name: 'Active Employee', employee: true)->setSortOrder(10);
-        $inactive = User::new(email: 'ie@example.com', name: 'Inactive Employee', employee: true)->setSortOrder(20)->setActive(false);
+        $active = User::new(email: 'ae@example.com', name: 'Active Employee', employee: true)->setPlainPassword('test-password')->setSortOrder(10);
+        $inactive = User::new(email: 'ie@example.com', name: 'Inactive Employee', employee: true)->setPlainPassword('test-password')->setSortOrder(20)->setActive(false);
         $this->entityManager->persist($active);
         $this->entityManager->persist($inactive);
         $this->entityManager->flush();
@@ -572,13 +579,13 @@ final class OrderControllerTest extends WebTestCase
     }
 
     private function createOrder(
-        string      $number,
-        User        $user,
+        string $number,
+        User $user,
         ProductType $productType,
-        Unit        $unit,
-        Customer    $customer,
+        Unit $unit,
+        Customer $customer,
         OrderStatus $status = OrderStatus::OPEN,
-        int         $itemCount = 1,
+        int $itemCount = 1,
     ): Order {
         $order = (new Order())
             ->setOrderNumber($number)

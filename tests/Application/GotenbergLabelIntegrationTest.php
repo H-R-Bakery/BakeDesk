@@ -143,7 +143,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
         $customer = (new Customer())
             ->setName('Snapshot Customer')
             ->setPhone(PhoneNumberUtil::getInstance()->parse('+18125551234', 'US'));
-        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
+        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true)->setPlainPassword('test-password');
         $donuts = (new ProductType())->setName('Donuts');
         $brownies = (new ProductType())->setName('Brownies');
         $dozen = (new Unit())->setName('Dozen');

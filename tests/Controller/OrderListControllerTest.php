@@ -123,7 +123,7 @@ final class OrderListControllerTest extends WebTestCase
 
     public function testPickupDateStatusAndUserFiltersAreAppliedInDatabase(): void
     {
-        $secondUser = User::new(email: 'jc@example.com', name: 'Jamie Cake', employee: true)->setSortOrder(20);
+        $secondUser = User::new(email: 'jc@example.com', name: 'Jamie Cake', employee: true)->setPlainPassword('test-password')->setSortOrder(20);
         $this->entityManager->persist($secondUser);
         $this->entityManager->flush();
         $today = $this->bakeryClock->today();
@@ -202,7 +202,7 @@ final class OrderListControllerTest extends WebTestCase
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
 
-        $this->user = User::new(email: 'ab@example.com', name: 'Alex Baker', employee: true)->setSortOrder(10);
+        $this->user = User::new(email: 'ab@example.com', name: 'Alex Baker', employee: true)->setPlainPassword('test-password')->setSortOrder(10);
         $this->productType = (new ProductType())->setName('Donuts')->setSortOrder(10);
         $this->unit = (new Unit())->setName('Each')->setPackageUnit(true)->setSortOrder(10);
         $this->entityManager->persist($this->user);

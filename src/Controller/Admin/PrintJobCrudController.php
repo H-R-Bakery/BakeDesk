@@ -13,6 +13,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Filters;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
@@ -65,8 +66,8 @@ final class PrintJobCrudController extends AbstractCrudController
     public function configureFields(string $pageName): iterable
     {
         yield IntegerField::new('id', 'ID')->hideOnIndex();
-        yield TextField::new('documentType', 'Document type')->formatValue(static fn ($value): string => $value instanceof \BackedEnum ? ucfirst($value->value) : (string) $value);
-        yield TextField::new('status', 'Status')->formatValue(static fn ($value): string => $value instanceof \BackedEnum ? ucfirst($value->value) : (string) $value);
+        yield ChoiceField::new('documentType', 'Document type');
+        yield ChoiceField::new('status', 'Status');
         yield AssociationField::new('printer', 'Printer');
         yield AssociationField::new('order', 'Order')->formatValue(static fn ($value): string => null === $value ? '' : 'Order '.$value->getOrderNumber());
         yield AssociationField::new('orderItem', 'Order item');
