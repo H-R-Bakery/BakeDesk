@@ -69,6 +69,34 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return list<Order>
+     */
+    public function findForProductionReport(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        return $this->createQueryBuilder('o')
+            ->innerJoin('o.items', 'item')
+            ->addSelect('item')
+            ->innerJoin('item.productType', 'productType')
+            ->addSelect('productType')
+            ->innerJoin('item.unit', 'unit')
+            ->addSelect('unit')
+            ->andWhere('o.pickupAt >= :start')
+            ->andWhere('o.pickupAt < :end')
+            ->andWhere('o.status IN (:includedStatuses)')
+            ->setParameter('start', $start, Types::DATETIME_IMMUTABLE)
+            ->setParameter('end', $end, Types::DATETIME_IMMUTABLE)
+            ->setParameter('includedStatuses', [OrderStatus::OPEN->value, OrderStatus::COMPLETED->value])
+            ->orderBy('productType.sortOrder', 'ASC')
+            ->addOrderBy('productType.name', 'ASC')
+            ->addOrderBy('o.pickupAt', 'ASC')
+            ->addOrderBy('o.orderNumber', 'ASC')
+            ->addOrderBy('item.sortOrder', 'ASC')
+            ->addOrderBy('item.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     private function createFilteredQueryBuilder(OrderSearchCriteria $criteria): \Doctrine\ORM\QueryBuilder
     {
         $queryBuilder = $this->createQueryBuilder('o');

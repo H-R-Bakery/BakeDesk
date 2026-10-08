@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            @page { size: Letter; margin: 0.55in 0.6in 0.6in; }
+            * { box-sizing: border-box; }
+            body { color: #000; font-family: Arial, sans-serif; font-size: 10pt; margin: 0; }
+            h1, h2, p { margin: 0; }
+            .header { border-bottom: 2px solid #000; margin-bottom: 20px; padding-bottom: 10px; }
+            .brand { font-size: 12pt; font-weight: bold; }
+            .title { font-size: 20pt; font-weight: bold; margin-top: 3px; }
+            .date { font-size: 11pt; margin-top: 4px; }
+            .section { break-inside: avoid; margin-bottom: 20px; }
+            .section-heading { border-bottom: 1px solid #000; padding-bottom: 4px; }
+            .product { font-size: 14pt; text-transform: uppercase; }
+            .total { font-size: 11pt; font-weight: bold; margin-top: 4px; }
+            table { border-collapse: collapse; margin-top: 8px; width: 100%; }
+            thead { display: table-header-group; }
+            tr { break-inside: avoid; }
+            th, td { border-bottom: 1px solid #777; padding: 5px 4px; text-align: left; vertical-align: top; }
+            th { border-bottom: 2px solid #000; font-size: 9pt; }
+            .order { white-space: nowrap; }
+            .empty { border: 1px solid #000; padding: 14px; }
+        </style>
+    </head>
+    <body>
+        <header class="header">
+            <p class="brand">BakeDesk</p>
+            <h1 class="title">Production Report</h1>
+            <p class="date">{{ report.pickupDate|date('l, F j, Y', bakery_timezone) }}</p>
+        </header>
+
+        {% if report.empty %}
+            <p class="empty">No production items found for this pickup date.</p>
+        {% else %}
+            {% for section in report.sections %}
+                <section class="section">
+                    <div class="section-heading">
+                        <h2 class="product">{{ section.productTypeName }}</h2>
+                        <p class="total">TOTAL TO MAKE: {{ section.totalEachQuantity }} EACH</p>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Pickup</th>
+                                <th>Customer</th>
+                                <th>Entered</th>
+                                <th>To make</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in section.lines %}
+                                <tr>
+                                    <td class="order">#{{ line.orderNumber }}</td>
+                                    <td>{{ line.pickupAt|date('g:i A', bakery_timezone) }}</td>
+                                    <td>{{ line.customerName }}</td>
+                                    <td>{{ line.quantity }} {{ line.unitName }}</td>
+                                    <td>{{ line.eachQuantity }} Each</td>
+                                    <td>{{ line.description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </section>
+            {% endfor %}
+        {% endif %}
+    </body>
+</html>

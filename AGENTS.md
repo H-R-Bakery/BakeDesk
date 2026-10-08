@@ -295,6 +295,11 @@ configurable Unit such as `Half Dozen` instead.
 
 Production reports are generated for a selected pickup date.
 
+Production report totals are grouped by ProductType and convert every
+contributing OrderItem to Each using the Unit's current eachEquivalent. Report
+totals are independent of package and label allocation, exclude CANCELLED
+Orders, and use one shared report model for browser and PDF output.
+
 V1 uses simple reporting rather than a normalized product catalog.
 
 Reports should:

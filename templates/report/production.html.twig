@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Production Report | BakeDesk{% endblock %}
+
+{% block body %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div>
+            <h1 class="h2 mb-1">Production Report</h1>
+            <p class="text-body-secondary mb-0">{{ report.pickupDate|date('l, F j, Y', bakery_timezone) }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary" href="{{ path('production_report_pdf', {date: report.pickupDate|date('Y-m-d', bakery_timezone)}) }}" target="_blank" rel="noopener">Preview PDF</a>
+            <a class="btn btn-primary" href="{{ path('production_report_pdf_download', {date: report.pickupDate|date('Y-m-d', bakery_timezone)}) }}">Download PDF</a>
+        </div>
+    </div>
+
+    <form method="get" action="{{ path('production_report') }}" class="card card-body shadow-sm mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+                <label class="form-label" for="production-report-date">Pickup date</label>
+                <input class="form-control" id="production-report-date" type="date" name="date" value="{{ report.pickupDate|date('Y-m-d', bakery_timezone) }}" required>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary" type="submit">Show report</button>
+            </div>
+        </div>
+    </form>
+
+    {% if report.empty %}
+        <div class="alert alert-info" role="status">No production items found for this pickup date.</div>
+    {% else %}
+        {% for section in report.sections %}
+            <section class="card shadow-sm mb-4" aria-labelledby="production-section-{{ loop.index }}">
+                <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <h2 class="h4 text-uppercase mb-0" id="production-section-{{ loop.index }}">{{ section.productTypeName }}</h2>
+                    <div class="fs-5 fw-bold">Total to make: {{ section.totalEachQuantity }} Each</div>
+                </div>
+                <div class="table-responsive">
+                    <table id="production-section-{{ loop.index }}-table" class="table table-striped table-hover align-middle mb-0"
+                           data-toggle="table" data-sortable="true" data-search="false" data-pagination="false"
+                           data-mobile-responsive="true" data-classes="table table-striped table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th data-field="order" data-sortable="true">Order #</th>
+                                <th data-field="pickup" data-sortable="true">Pickup</th>
+                                <th data-field="customer" data-sortable="true">Customer</th>
+                                <th data-field="entered">Entered</th>
+                                <th data-field="each">To make</th>
+                                <th data-field="description">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for line in section.lines %}
+                                <tr>
+                                    <td class="fw-semibold">#{{ line.orderNumber }}</td>
+                                    <td data-sort-value="{{ line.pickupAt|date('Y-m-d H:i:s', bakery_timezone) }}">{{ line.pickupAt|date('g:i A', bakery_timezone) }}</td>
+                                    <td>{{ line.customerName }}</td>
+                                    <td>{{ line.quantity }} {{ line.unitName }}</td>
+                                    <td>{{ line.eachQuantity }} Each</td>
+                                    <td>{{ line.description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        {% endfor %}
+    {% endif %}
+{% endblock %}

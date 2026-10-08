@@ -11,7 +11,8 @@ use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 #[AsAlias(DocumentRendererInterface::class)]
-final class GotenbergDocumentRenderer implements DocumentRendererInterface
+#[AsAlias(ConfigurableDocumentRendererInterface::class)]
+final class GotenbergDocumentRenderer implements ConfigurableDocumentRendererInterface
 {
     public function __construct(
         private readonly ClientInterface $httpClient,
@@ -22,10 +23,15 @@ final class GotenbergDocumentRenderer implements DocumentRendererInterface
 
     public function renderHtmlToPdf(string $html): string
     {
+        return $this->renderHtmlToPdfWithOptions($html, '4in', '6in', 'order-label');
+    }
+
+    public function renderHtmlToPdfWithOptions(string $html, string $paperWidth, string $paperHeight, string $outputFilename): string
+    {
         $request = Gotenberg::chromium($this->baseUrl)
             ->pdf()
-            ->outputFilename('order-label')
-            ->paperSize('4in', '6in')
+            ->outputFilename($outputFilename)
+            ->paperSize($paperWidth, $paperHeight)
             ->margins('0', '0', '0', '0')
             ->preferCssPageSize()
             ->printBackground()
