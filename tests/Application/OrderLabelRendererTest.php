@@ -41,7 +41,7 @@ final class OrderLabelRendererTest extends KernelTestCase
             ->expects(self::once())
             ->method('write')
             ->with(
-                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9a-f]{16}\.pdf$#'),
+                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#'),
                 '%PDF-1.7 test label',
             );
 
