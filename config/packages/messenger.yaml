@@ -21,4 +21,11 @@ framework:
             messenger.bus.default: []
 
         routing:
-#            App\Message\PrintDocument: print
+            App\Message\ProcessPrintJob: print
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                print:
+                    dsn: 'in-memory://'

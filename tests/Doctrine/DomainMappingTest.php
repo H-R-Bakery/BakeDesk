@@ -52,11 +52,18 @@ final class DomainMappingTest extends KernelTestCase
         $printJobMetadata = $entityManager->getClassMetadata(PrintJob::class);
         self::assertSame(PrintDocumentType::class, $printJobMetadata->getFieldMapping('documentType')->enumType);
         self::assertSame(PrintJobStatus::class, $printJobMetadata->getFieldMapping('status')->enumType);
+        self::assertTrue($printJobMetadata->hasField('documentPath'));
+        self::assertTrue($printJobMetadata->getFieldMapping('documentPath')->nullable);
         self::assertSame('date_immutable', $printJobMetadata->getFieldMapping('reportDate')->type);
         self::assertTrue($printJobMetadata->getFieldMapping('reportDate')->nullable);
 
         $printerMetadata = $entityManager->getClassMetadata(Printer::class);
         self::assertTrue($printerMetadata->hasField('active'));
+        self::assertTrue($printerMetadata->hasField('defaultForLabels'));
+        self::assertSame(
+            ['default_for_labels'],
+            $printerMetadata->table['uniqueConstraints']['uniq_printer_default_for_labels']['columns'],
+        );
         self::assertSame('datetime_immutable', $printerMetadata->getFieldMapping('createdAt')->type);
         self::assertSame('datetime_immutable', $printerMetadata->getFieldMapping('updatedAt')->type);
     }

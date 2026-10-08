@@ -18,6 +18,7 @@ final class PrinterPrintJobTest extends TestCase
         self::assertFalse($printer->isForLabels());
         self::assertFalse($printer->isForReports());
         self::assertTrue($printer->isActive());
+        self::assertFalse($printer->isDefaultForLabels());
     }
 
     public function testPrinterCapabilitiesCanBeConfiguredIndependently(): void
@@ -32,6 +33,30 @@ final class PrinterPrintJobTest extends TestCase
         self::assertTrue($reportsOnly->isForReports());
         self::assertTrue($both->isForLabels());
         self::assertTrue($both->isForReports());
+    }
+
+    public function testDefaultLabelPrinterRequiresActiveLabelCapability(): void
+    {
+        $printer = new Printer();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $printer->setDefaultForLabels(true);
+    }
+
+    public function testDefaultLabelPrinterCannotBeDeactivatedOrHaveItsLabelCapabilityRemoved(): void
+    {
+        $printer = (new Printer())
+            ->setForLabels(true)
+            ->setDefaultForLabels(true);
+
+        try {
+            $printer->setActive(false);
+            self::fail('A default label printer must remain active.');
+        } catch (\InvalidArgumentException) {
+        }
+
+        $this->expectException(\InvalidArgumentException::class);
+        $printer->setForLabels(false);
     }
 
     public function testPrintJobDefaultsToQueuedWithNoAttempts(): void

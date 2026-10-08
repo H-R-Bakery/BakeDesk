@@ -18,7 +18,7 @@ final class WorkflowStatusTest extends TestCase
 
     public function testPrintJobStatusValues(): void
     {
-        self::assertSame(['queued', 'processing', 'submitted', 'completed', 'failed', 'cancelled'], array_map(
+        self::assertSame(['queued', 'processing', 'rendered', 'submitted', 'completed', 'failed', 'cancelled'], array_map(
             static fn (PrintJobStatus $status): string => $status->value,
             PrintJobStatus::cases(),
         ));

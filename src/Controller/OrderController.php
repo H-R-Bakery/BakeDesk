@@ -12,12 +12,15 @@ use App\Application\Order\OrderCanceller;
 use App\Application\Order\OrderFormDataFactory;
 use App\Application\Order\OrderSearchCriteria;
 use App\Application\Order\OrderUpdater;
+use App\Application\Printing\LabelPrinterConfigurationException;
+use App\Application\Printing\LabelPrintJobCreator;
 use App\Entity\Order;
 use App\Form\Model\NewOrderData;
 use App\Form\NewOrderType;
 use App\Model\OrderStatus;
 use App\Repository\EmployeeRepository;
 use App\Repository\OrderRepository;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,8 +32,13 @@ use Symfony\Component\Routing\Attribute\Route;
 final class OrderController extends AbstractController
 {
     #[Route('/order/new', name: 'order_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, NewOrderInputFactory $newOrderInputFactory, BakeryClock $bakeryClock): Response
-    {
+    public function new(
+        Request $request,
+        NewOrderInputFactory $newOrderInputFactory,
+        BakeryClock $bakeryClock,
+        LabelPrintJobCreator $labelPrintJobCreator,
+        LoggerInterface $logger,
+    ): Response {
         $data = new NewOrderData();
         $data->pickupDate = $bakeryClock->tomorrow();
         $data->pickupTime = $bakeryClock->tomorrow(morning: true);
@@ -40,6 +48,31 @@ final class OrderController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $order = $newOrderInputFactory->create($data);
+
+            try {
+                $labelPrintJobCreator->createAndDispatch($order);
+                $this->addFlash('success', sprintf('Order #%s saved. Label queued.', $order->getOrderNumber()));
+            } catch (LabelPrinterConfigurationException $exception) {
+                $logger->warning('Order label could not be queued because printer configuration is invalid.', [
+                    'order_id' => $order->getId(),
+                    'order_number' => $order->getOrderNumber(),
+                    'exception' => $exception,
+                ]);
+                $this->addFlash('warning', sprintf(
+                    'Order #%s saved, but no default label printer is configured.',
+                    $order->getOrderNumber(),
+                ));
+            } catch (\Throwable $exception) {
+                $logger->error('Order label could not be queued.', [
+                    'order_id' => $order->getId(),
+                    'order_number' => $order->getOrderNumber(),
+                    'exception' => $exception,
+                ]);
+                $this->addFlash('warning', sprintf(
+                    'Order #%s saved, but its label could not be queued.',
+                    $order->getOrderNumber(),
+                ));
+            }
 
             return $this->redirectToRoute('order_created', ['id' => $order->getId()]);
         }

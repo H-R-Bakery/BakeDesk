@@ -44,6 +44,9 @@ class PrintJob
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $externalJobId = null;
 
+    #[ORM\Column(length: 2048, nullable: true)]
+    private ?string $documentPath = null;
+
     #[Assert\GreaterThanOrEqual(0)]
     #[ORM\Column(options: ['default' => 0])]
     private int $attemptCount = 0;
@@ -141,6 +144,18 @@ class PrintJob
     public function setExternalJobId(?string $externalJobId): static
     {
         $this->externalJobId = $externalJobId;
+
+        return $this;
+    }
+
+    public function getDocumentPath(): ?string
+    {
+        return $this->documentPath;
+    }
+
+    public function setDocumentPath(?string $documentPath): static
+    {
+        $this->documentPath = $documentPath;
 
         return $this;
     }

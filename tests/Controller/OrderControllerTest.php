@@ -15,6 +15,8 @@ use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Model\OrderStatus;
+use App\Model\PrintDocumentType;
+use App\Model\PrintJobStatus;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -131,10 +133,12 @@ final class OrderControllerTest extends WebTestCase
         $this->client->followRedirect();
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1', 'Order 2000');
+        self::assertSelectorTextContains('.alert-warning', 'no default label printer is configured');
         $this->entityManager->clear();
         $order = $this->entityManager->getRepository(Order::class)->findOneBy(['orderNumber' => '2000']);
 
         self::assertInstanceOf(Order::class, $order);
+        self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
         self::assertSame('Taylor Baker', $order->getCustomerName());
         self::assertNotNull($order->getCustomerPhone());
         self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($order->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
@@ -148,6 +152,53 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(['Glazed', 'Chocolate'], array_map(static fn (OrderItem $item): string => $item->getDescription(), $items));
         self::assertSame(['2.25', '1'], array_map(static fn (OrderItem $item): string => $item->getQuantity(), $items));
         self::assertSame([0, 1], array_map(static fn (OrderItem $item): int => $item->getSortOrder(), $items));
+    }
+
+    public function testNewOrderCreatesQueuedLabelPrintJobWithoutRenderingDuringHttpRequest(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $printer = (new Printer())
+            ->setName('Configured label printer')
+            ->setAddress('ipp://printer.example/labels')
+            ->setForLabels(true)
+            ->setDefaultForLabels(true);
+        $this->entityManager->persist($printer);
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/order/new');
+        $form = $crawler->selectButton('Save order')->form([
+            'new_order[customerName]' => 'Queued Customer',
+            'new_order[customerPhone]' => '8125551234',
+            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[pickupDate]' => '2026-10-10',
+            'new_order[pickupTime]' => '09:30',
+            'new_order[items][0][productType]' => (string) $productType->getId(),
+            'new_order[items][0][quantity]' => '1',
+            'new_order[items][0][unit]' => (string) $unit->getId(),
+            'new_order[items][0][description]' => 'Plain',
+        ]);
+
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/order/1/created');
+        $this->entityManager->clear();
+        $printJob = $this->entityManager->getRepository(PrintJob::class)->findOneBy([]);
+
+        self::assertInstanceOf(PrintJob::class, $printJob);
+        self::assertSame(PrintDocumentType::LABEL, $printJob->getDocumentType());
+        self::assertSame(PrintJobStatus::QUEUED, $printJob->getStatus());
+        self::assertNull($printJob->getDocumentPath());
+        self::assertSame(0, $printJob->getAttemptCount());
+        self::assertSame($printer->getId(), $printJob->getPrinter()?->getId());
+
+        $transport = self::getContainer()->get('messenger.transport.print');
+        self::assertCount(1, $transport->getSent());
+        self::assertSame(
+            ['printJobId' => $printJob->getId()],
+            get_object_vars($transport->getSent()[0]->getMessage()),
+        );
     }
 
     public function testExistingCustomerIsReusedAndNewCustomerIsCreatedWhenNeeded(): void

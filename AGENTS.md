@@ -306,6 +306,7 @@ A printer should include, at minimum:
 - active state
 - whether it may print labels
 - whether it may print reports
+- whether it is the active default label printer
 
 Additional configuration may be added later when demonstrated by an actual requirement.
 
@@ -336,6 +337,7 @@ Printing-related responsibilities should be separated so that another IPP implem
 Gotenberg 8 is the application PDF rendering service for HTML documents, using the official `gotenberg/gotenberg-php` client.
 
 Generated documents are private application artifacts stored through `league/flysystem-bundle`; application code must use the Flysystem abstraction rather than depending on local filesystem paths.
+`PrintJob` stores the generated document's logical Flysystem path, never an absolute filesystem path.
 
 ---
 
@@ -399,6 +401,7 @@ Initial `PrintJobStatus` values are:
 
 - `QUEUED`
 - `PROCESSING`
+- `RENDERED`
 - `SUBMITTED`
 - `COMPLETED`
 - `FAILED`
@@ -412,6 +415,7 @@ Meaning:
 - `COMPLETED`: printer subsystem reported successful completion
 - `FAILED`: processing or printing failed
 - `CANCELLED`: job was intentionally cancelled
+- `RENDERED`: the application generated and stored the document; no printer submission has occurred yet.
 
 Do not assume every printer can reliably report physical print completion.
 

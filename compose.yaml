@@ -20,8 +20,12 @@ services:
       - "5432:5432"
   ###< doctrine/doctrine-bundle ###
   redis:
-    image: redis:8-alpine
+    image: valkey/valkey:8.1-alpine
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    environment:
+      VALKEY_EXTRA_FLAGS: "--maxmemory-policy volatile-lru --loglevel debug --timeout 0 --tcp-keepalive 300 --maxmemory 50m"
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
