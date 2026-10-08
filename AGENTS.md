@@ -246,7 +246,15 @@ Seed administrator-managed `Unit` records for:
 
 Units must not be PHP enums because administrators may need to add or change them later.
 
-Do not automatically convert units.
+Do not automatically rewrite stored or displayed order quantities and units.
+
+Every Unit resolves globally to a configurable number of individual items
+(`Each`) through its required decimal `eachEquivalent` value. Unit names have
+no hard-coded mathematical meaning, and the value does not vary by
+`ProductType`. Production totals calculate `OrderItem.quantity ×
+Unit.eachEquivalent` using decimal-safe arithmetic and the current Unit
+configuration. This derived production quantity does not change the original
+OrderItem or its package label content.
 
 For example:
 
@@ -254,6 +262,16 @@ For example:
 - `1 Dozen`
 
 remain separate quantities unless a future requirement explicitly adds normalization.
+Production conversion is a separate calculation for reports.
+
+`eachEquivalent` and `isPackageUnit` answer separate questions. The former
+converts a Unit to individual production items; the latter determines physical
+package and label behavior. PackagingRule calculations and production
+calculations remain separate concerns.
+
+Production reports initially use the currently configured `eachEquivalent`.
+Conversion history is not versioned in this task, so later Unit changes can
+affect future calculations without rewriting historical OrderItems.
 
 ### Physical package labels
 

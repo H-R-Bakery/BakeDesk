@@ -20,7 +20,12 @@
                             <label class="form-label" for="password">Password</label>
                             <input class="form-control" id="password" name="_password" type="password" autocomplete="current-password" required>
                         </div>
-                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                        <input
+                            type="hidden"
+                            name="_csrf_token"
+                            data-controller="csrf-protection"
+                            value="{{ csrf_token('authenticate') }}"
+                        >
                         <button class="btn btn-primary w-100" type="submit">Sign in</button>
                     </form>
                 </div>

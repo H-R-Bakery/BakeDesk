@@ -2,7 +2,9 @@
 
 namespace App\Entity;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 class Unit
@@ -19,6 +21,10 @@ class Unit
 
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $abbreviation = null;
+
+    #[Assert\Positive]
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
+    private string $eachEquivalent = '1.00';
 
     #[ORM\Column(options: ['default' => false])]
     private bool $packageUnit = false;
@@ -51,6 +57,18 @@ class Unit
     public function setAbbreviation(?string $abbreviation): static
     {
         $this->abbreviation = $abbreviation;
+
+        return $this;
+    }
+
+    public function getEachEquivalent(): string
+    {
+        return $this->eachEquivalent;
+    }
+
+    public function setEachEquivalent(string $eachEquivalent): static
+    {
+        $this->eachEquivalent = $eachEquivalent;
 
         return $this;
     }

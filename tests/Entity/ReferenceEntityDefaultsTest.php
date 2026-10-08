@@ -44,6 +44,7 @@ final class ReferenceEntityDefaultsTest extends TestCase
         self::assertTrue($unit->isActive());
         self::assertSame(0, $unit->getSortOrder());
         self::assertNull($unit->getAbbreviation());
+        self::assertSame('1.00', $unit->getEachEquivalent());
         self::assertFalse($unit->isPackageUnit());
     }
 }

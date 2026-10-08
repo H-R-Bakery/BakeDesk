@@ -53,6 +53,9 @@ final class DomainMappingTest extends KernelTestCase
         $unitMetadata = $entityManager->getClassMetadata(Unit::class);
         self::assertTrue($unitMetadata->hasField('packageUnit'));
         self::assertSame('boolean', $unitMetadata->getFieldMapping('packageUnit')->type);
+        self::assertSame('decimal', $unitMetadata->getFieldMapping('eachEquivalent')->type);
+        self::assertSame(10, $unitMetadata->getFieldMapping('eachEquivalent')->precision);
+        self::assertSame(2, $unitMetadata->getFieldMapping('eachEquivalent')->scale);
 
         $packagingRuleMetadata = $entityManager->getClassMetadata(PackagingRule::class);
         self::assertSame('decimal', $packagingRuleMetadata->getFieldMapping('quantityPerPackage')->type);

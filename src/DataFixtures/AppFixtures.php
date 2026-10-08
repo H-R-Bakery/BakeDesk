@@ -37,16 +37,18 @@ final class AppFixtures extends Fixture
 
         $units = [];
         foreach ([
-            ['Each', 'ea', 10, false],
-            ['Dozen', 'doz', 20, true],
-            ['Half Dozen', '1/2 doz', 30, false],
-            ['Tray', 'tray', 40, true],
-            ['Box', 'box', 50, true],
-        ] as [$name, $abbreviation, $sortOrder, $isPackageUnit]) {
+            ['Each', 'ea', 10, false, '1.00'],
+            // These values are valid bootstrap values only; the bakery owner must review them in administration.
+            ['Dozen', 'doz', 20, true, '12.00'],
+            ['Half Dozen', '1/2 doz', 30, false, '6.00'],
+            ['Tray', 'tray', 40, true, '20.00'],
+            ['Box', 'box', 50, true, '24.00'],
+        ] as [$name, $abbreviation, $sortOrder, $isPackageUnit, $eachEquivalent]) {
             $unit = (new Unit())
                 ->setName($name)
                 ->setAbbreviation($abbreviation)
                 ->setActive(true)
+                ->setEachEquivalent($eachEquivalent)
                 ->setPackageUnit($isPackageUnit)
                 ->setSortOrder($sortOrder);
             $units[$name] = $unit;
