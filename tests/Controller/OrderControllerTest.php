@@ -7,7 +7,6 @@ namespace App\Tests\Controller;
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Order\OrderNumberGenerator;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -15,6 +14,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use App\Model\OrderStatus;
 use App\Model\PrintDocumentType;
 use App\Model\PrintJobStatus;
@@ -45,7 +45,7 @@ final class OrderControllerTest extends WebTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
 
@@ -56,7 +56,7 @@ final class OrderControllerTest extends WebTestCase
 
     public function testNewOrderPageShowsActiveReferenceData(): void
     {
-        [$activeEmployee, $inactiveEmployee] = $this->createEmployees();
+        [$activeUser, $inactiveUser] = $this->createUsers();
         [$activeProductType, $inactiveProductType] = $this->createProductTypes();
         [$activeUnit, $inactiveUnit] = $this->createUnits();
 
@@ -64,8 +64,8 @@ final class OrderControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('h1', 'New order');
-        self::assertSelectorExists(sprintf('input[value="%d"]', $activeEmployee->getId()));
-        self::assertSelectorNotExists(sprintf('input[value="%d"]', $inactiveEmployee->getId()));
+        self::assertSelectorExists(sprintf('input[value="%d"]', $activeUser->getId()));
+        self::assertSelectorNotExists(sprintf('input[value="%d"]', $inactiveUser->getId()));
         self::assertSelectorTextContains('select[name="new_order[items][0][productType]"]', $activeProductType->getName());
         self::assertStringNotContainsString($inactiveProductType->getName(), $crawler->filter('select[name="new_order[items][0][productType]"]')->text());
         self::assertSelectorTextContains('select[name="new_order[items][0][unit]"]', $activeUnit->getName());
@@ -102,7 +102,7 @@ final class OrderControllerTest extends WebTestCase
 
     public function testValidOrderSubmissionRedirectsAndPersistsAllValues(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
 
@@ -110,7 +110,7 @@ final class OrderControllerTest extends WebTestCase
         $form = $crawler->selectButton('Save order')->form([
             'new_order[customerName]' => 'Taylor Baker',
             'new_order[customerPhone]' => '8125551234',
-            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[user]' => (string) $user->getId(),
             'new_order[pickupDate]' => '2026-10-10',
             'new_order[pickupTime]' => '09:30',
             'new_order[paid]' => '1',
@@ -143,7 +143,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('Taylor Baker', $order->getCustomerName());
         self::assertNotNull($order->getCustomerPhone());
         self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($order->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
-        self::assertSame($employee->getId(), $order->getEmployee()?->getId());
+        self::assertSame($user->getId(), $order->getUser()?->getId());
         self::assertSame('2000', $order->getOrderNumber());
         self::assertSame('2026-10-10 13:30:00', $order->getPickupAt()?->format('Y-m-d H:i:s'));
         self::assertTrue($order->isPaid());
@@ -157,7 +157,7 @@ final class OrderControllerTest extends WebTestCase
 
     public function testNewOrderCreatesQueuedLabelPrintJobWithoutRenderingDuringHttpRequest(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $printer = (new Printer())
@@ -172,7 +172,7 @@ final class OrderControllerTest extends WebTestCase
         $form = $crawler->selectButton('Save order')->form([
             'new_order[customerName]' => 'Queued Customer',
             'new_order[customerPhone]' => '8125551234',
-            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[user]' => (string) $user->getId(),
             'new_order[pickupDate]' => '2026-10-10',
             'new_order[pickupTime]' => '09:30',
             'new_order[items][0][productType]' => (string) $productType->getId(),
@@ -204,7 +204,7 @@ final class OrderControllerTest extends WebTestCase
 
     public function testMissingPackagingRuleLeavesOrderSavedWithoutPartialLabelJobs(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         $dozen = (new Unit())->setName('Dozen')->setPackageUnit(true)->setActive(true);
         $each = (new Unit())->setName('Each')->setPackageUnit(false)->setActive(true);
@@ -221,7 +221,7 @@ final class OrderControllerTest extends WebTestCase
         $form = $crawler->selectButton('Save order')->form([
             'new_order[customerName]' => 'Packaging Failure Customer',
             'new_order[customerPhone]' => '8125551234',
-            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[user]' => (string) $user->getId(),
             'new_order[pickupDate]' => '2026-10-10',
             'new_order[pickupTime]' => '09:30',
             'new_order[items][0][productType]' => (string) $productType->getId(),
@@ -248,16 +248,16 @@ final class OrderControllerTest extends WebTestCase
 
     public function testExistingCustomerIsReusedAndNewCustomerIsCreatedWhenNeeded(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $existingCustomer = $this->createCustomer('Existing Customer', '+18125551235');
 
-        $this->submitOrder($employee, $productType, $unit, 'New Name', '8125551236', 1);
+        $this->submitOrder($user, $productType, $unit, 'New Name', '8125551236', 1);
         $this->entityManager->clear();
         self::assertSame(2, $this->entityManager->getRepository(Customer::class)->count([]));
 
-        $this->submitOrder($employee, $productType, $unit, 'Changed Name', '(812) 555-1235', 2);
+        $this->submitOrder($user, $productType, $unit, 'Changed Name', '(812) 555-1235', 2);
         $this->entityManager->clear();
         self::assertSame(2, $this->entityManager->getRepository(Customer::class)->count([]));
         $reused = $this->entityManager->getRepository(Customer::class)->find($existingCustomer->getId());
@@ -278,13 +278,13 @@ final class OrderControllerTest extends WebTestCase
 
     public function testOpenOrderCanBeEditedAndKeepsItsOrderNumber(): void
     {
-        [$employee, $replacementEmployee] = $this->createEmployees();
-        $replacementEmployee->setActive(true);
+        [$user, $replacementUser] = $this->createUsers();
+        $replacementUser->setActive(true);
         $this->entityManager->flush();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $customer = $this->createCustomer('Original Customer', '+18125551234');
-        $order = $this->createOrder('3000', $employee, $productType, $unit, $customer);
+        $order = $this->createOrder('3000', $user, $productType, $unit, $customer);
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
         self::assertResponseIsSuccessful();
@@ -295,7 +295,7 @@ final class OrderControllerTest extends WebTestCase
         $values = $form->getPhpValues();
         $values['new_order']['customerName'] = 'Updated Customer';
         $values['new_order']['customerPhone'] = '8125551234';
-        $values['new_order']['employee'] = (string) $replacementEmployee->getId();
+        $values['new_order']['user'] = (string) $replacementUser->getId();
         $values['new_order']['pickupDate'] = '2026-10-12';
         $values['new_order']['pickupTime'] = '14:45';
         $values['new_order']['paid'] = '1';
@@ -311,7 +311,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('3000', $updatedOrder->getOrderNumber());
         self::assertSame('Updated Customer', $updatedOrder->getCustomerName());
         self::assertSame('+18125551234', PhoneNumberUtil::getInstance()->format($updatedOrder->getCustomerPhone(), \libphonenumber\PhoneNumberFormat::E164));
-        self::assertSame($replacementEmployee->getId(), $updatedOrder->getEmployee()?->getId());
+        self::assertSame($replacementUser->getId(), $updatedOrder->getUser()?->getId());
         self::assertSame('2026-10-12 18:45:00', $updatedOrder->getPickupAt()?->format('Y-m-d H:i:s'));
         self::assertTrue($updatedOrder->isPaid());
         self::assertSame('Updated notes', $updatedOrder->getNotes());
@@ -319,12 +319,12 @@ final class OrderControllerTest extends WebTestCase
 
     public function testEditingReassociatesToPhoneMatchWithoutRenamingExistingCustomer(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $originalCustomer = $this->createCustomer('Original Customer', '+18125551234');
         $replacementCustomer = $this->createCustomer('Replacement Customer', '+18125551235');
-        $order = $this->createOrder('3001', $employee, $productType, $unit, $originalCustomer);
+        $order = $this->createOrder('3001', $user, $productType, $unit, $originalCustomer);
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
         $form = $crawler->selectButton('Save changes')->form();
@@ -352,11 +352,11 @@ final class OrderControllerTest extends WebTestCase
 
     public function testEditingWithUnknownPhoneCreatesAndAssociatesANewCustomer(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $originalCustomer = $this->createCustomer('Original Customer', '+18125551234');
-        $order = $this->createOrder('3002', $employee, $productType, $unit, $originalCustomer);
+        $order = $this->createOrder('3002', $user, $productType, $unit, $originalCustomer);
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
         $form = $crawler->selectButton('Save changes')->form();
@@ -380,11 +380,11 @@ final class OrderControllerTest extends WebTestCase
 
     public function testEditingSynchronizesItemsAndUsesVisualOrderForSortOrder(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $customer = $this->createCustomer('Customer', '+18125551234');
-        $order = $this->createOrder('3003', $employee, $productType, $unit, $customer, itemCount: 2);
+        $order = $this->createOrder('3003', $user, $productType, $unit, $customer, itemCount: 2);
         $removedItem = $order->getItems()->toArray()[1];
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
@@ -416,11 +416,11 @@ final class OrderControllerTest extends WebTestCase
 
     public function testCancellationRequiresCsrfAndRetainsHistoricalData(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $customer = $this->createCustomer('Customer', '+18125551234');
-        $order = $this->createOrder('3004', $employee, $productType, $unit, $customer);
+        $order = $this->createOrder('3004', $user, $productType, $unit, $customer);
         $orderId = $order->getId();
         $itemId = $order->getItems()->first()->getId();
 
@@ -444,7 +444,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(OrderStatus::CANCELLED, $cancelledOrder->getStatus());
         self::assertSame('3004', $cancelledOrder->getOrderNumber());
         self::assertSame($customer->getId(), $cancelledOrder->getCustomer()?->getId());
-        self::assertSame($employee->getId(), $cancelledOrder->getEmployee()?->getId());
+        self::assertSame($user->getId(), $cancelledOrder->getUser()?->getId());
         self::assertCount(1, $cancelledOrder->getItems());
         self::assertInstanceOf(OrderItem::class, $this->entityManager->getRepository(OrderItem::class)->find($itemId));
 
@@ -463,12 +463,12 @@ final class OrderControllerTest extends WebTestCase
 
     public function testCompletedAndCancelledOrdersCannotBeEdited(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $customer = $this->createCustomer('Customer', '+18125551234');
-        $completed = $this->createOrder('3005', $employee, $productType, $unit, $customer, OrderStatus::COMPLETED);
-        $cancelled = $this->createOrder('3006', $employee, $productType, $unit, $customer, OrderStatus::CANCELLED);
+        $completed = $this->createOrder('3005', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $cancelled = $this->createOrder('3006', $user, $productType, $unit, $customer, OrderStatus::CANCELLED);
 
         $this->client->request('GET', '/orders/'.$completed->getId().'/edit');
         self::assertResponseStatusCodeSame(403);
@@ -478,11 +478,11 @@ final class OrderControllerTest extends WebTestCase
 
     public function testLabelPreviewReturnsStoredPdfWithoutCreatingPrintJob(): void
     {
-        [$employee] = $this->createEmployees();
+        [$user] = $this->createUsers();
         [$productType] = $this->createProductTypes();
         [$unit] = $this->createUnits();
         $customer = $this->createCustomer('Preview Customer', '+18125551234');
-        $order = $this->createOrder('3010', $employee, $productType, $unit, $customer);
+        $order = $this->createOrder('3010', $user, $productType, $unit, $customer);
         self::getContainer()->set(DocumentRendererInterface::class, new class implements DocumentRendererInterface {
             public function renderHtmlToPdf(string $html): string
             {
@@ -506,13 +506,13 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
-    private function submitOrder(Employee $employee, ProductType $productType, Unit $unit, string $name, string $phone, int $orderNumber): void
+    private function submitOrder(User $user, ProductType $productType, Unit $unit, string $name, string $phone, int $orderNumber): void
     {
         $crawler = $this->client->request('GET', '/order/new');
         $form = $crawler->selectButton('Save order')->form([
             'new_order[customerName]' => $name,
             'new_order[customerPhone]' => $phone,
-            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[user]' => (string) $user->getId(),
             'new_order[pickupDate]' => '2026-10-10',
             'new_order[pickupTime]' => '09:30',
             'new_order[items][0][productType]' => (string) $productType->getId(),
@@ -524,11 +524,11 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseRedirects(sprintf('/order/%d/created', $orderNumber));
     }
 
-    /** @return array{Employee, Employee} */
-    private function createEmployees(): array
+    /** @return array{User, User} */
+    private function createUsers(): array
     {
-        $active = (new Employee())->setName('Active Employee')->setSortOrder(10)->setActive(true);
-        $inactive = (new Employee())->setName('Inactive Employee')->setSortOrder(20)->setActive(false);
+        $active = User::new(email: 'ae@example.com', name: 'Active Employee', employee: true)->setSortOrder(10);
+        $inactive = User::new(email: 'ie@example.com', name: 'Inactive Employee', employee: true)->setSortOrder(20)->setActive(false);
         $this->entityManager->persist($active);
         $this->entityManager->persist($inactive);
         $this->entityManager->flush();
@@ -572,18 +572,18 @@ final class OrderControllerTest extends WebTestCase
     }
 
     private function createOrder(
-        string $number,
-        Employee $employee,
+        string      $number,
+        User        $user,
         ProductType $productType,
-        Unit $unit,
-        Customer $customer,
+        Unit        $unit,
+        Customer    $customer,
         OrderStatus $status = OrderStatus::OPEN,
-        int $itemCount = 1,
+        int         $itemCount = 1,
     ): Order {
         $order = (new Order())
             ->setOrderNumber($number)
             ->setCustomer($customer)
-            ->setEmployee($employee)
+            ->setUser($user)
             ->setPickupAt(new \DateTimeImmutable('2026-10-10 09:00:00', new \DateTimeZone('America/Indiana/Indianapolis')))
             ->setOrderedAt(new \DateTimeImmutable('2026-10-07 14:00:00', new \DateTimeZone('America/Indiana/Indianapolis')))
             ->setStatus($status);

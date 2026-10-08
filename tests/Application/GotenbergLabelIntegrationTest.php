@@ -8,11 +8,11 @@ use App\Application\Document\GotenbergDocumentRenderer;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use League\Flysystem\FilesystemOperator;
 use libphonenumber\PhoneNumberUtil;
 use Psr\Log\NullLogger;
@@ -143,7 +143,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
         $customer = (new Customer())
             ->setName('Snapshot Customer')
             ->setPhone(PhoneNumberUtil::getInstance()->parse('+18125551234', 'US'));
-        $employee = (new Employee())->setName('Counter Employee');
+        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
         $donuts = (new ProductType())->setName('Donuts');
         $brownies = (new ProductType())->setName('Brownies');
         $dozen = (new Unit())->setName('Dozen');
@@ -151,7 +151,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
         $order = (new Order())
             ->setOrderNumber('1234')
             ->setCustomer($customer)
-            ->setEmployee($employee)
+            ->setUser($user)
             ->setPickupAt(new \DateTimeImmutable('2026-10-10 09:30:00', new \DateTimeZone('America/Indiana/Indianapolis')))
             ->setOrderedAt(new \DateTimeImmutable('2026-10-07 13:24:00', new \DateTimeZone('America/Indiana/Indianapolis')))
             ->setPaid(true);

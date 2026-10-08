@@ -333,7 +333,7 @@
 
             <div class="metadata">
                 <div class="order-number">Order #{{ order.orderNumber }}</div>
-                <div class="secondary">Taken by {{ order.employee.name }}</div>
+                <div class="secondary">Taken by {{ order.user.name }}</div>
                 <div class="secondary">Ordered {{ ordered_at|date('M j, Y, g:i A', bakery_timezone) }}</div>
             </div>
 

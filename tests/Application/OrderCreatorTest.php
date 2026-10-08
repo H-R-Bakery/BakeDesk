@@ -10,7 +10,6 @@ use App\Application\Order\OrderInput;
 use App\Application\Order\OrderItemInput;
 use App\Application\Order\OrderNumberGenerator;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -18,8 +17,10 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use App\Repository\CustomerRepository;
 use App\Repository\OrderRepository;
+use App\Repository\UserRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Types\Type;
@@ -44,6 +45,8 @@ final class OrderCreatorTest extends TestCase
 
     private OrderRepository $orderRepository;
 
+    private UserRepository $userRepository;
+
     protected function setUp(): void
     {
         if (!Type::hasType('phone_number')) {
@@ -63,7 +66,7 @@ final class OrderCreatorTest extends TestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
 
@@ -74,6 +77,7 @@ final class OrderCreatorTest extends TestCase
 
         $this->customerRepository = new CustomerRepository($registry);
         $this->orderRepository = new OrderRepository($registry);
+        $this->userRepository = new UserRepository($registry);
         $sequenceConnection = $this->createStub(Connection::class);
         $sequenceConnection->method('fetchOne')->willReturn('1000');
         $orderNumberGenerator = new OrderNumberGenerator($sequenceConnection);
@@ -143,10 +147,10 @@ final class OrderCreatorTest extends TestCase
 
     public function testOrderFieldsAndItemsArePopulatedThroughEntityApis(): void
     {
-        $employee = (new Employee())->setName('Morgan Baker');
+        $user = User::new(email: 'mb@example.com', name: 'Morgan Baker', employee: true);
         $productType = (new ProductType())->setName('Donuts');
         $unit = (new Unit())->setName('Dozen');
-        $this->entityManager->persist($employee);
+        $this->entityManager->persist($user);
         $this->entityManager->persist($productType);
         $this->entityManager->persist($unit);
         $this->entityManager->flush();
@@ -156,7 +160,7 @@ final class OrderCreatorTest extends TestCase
         $order = $this->orderCreator->create(new OrderInput(
             customerName: 'Jamie Baker',
             customerPhone: $this->phone('+18125551238'),
-            employee: $employee,
+            user: $user,
             pickupAt: $pickupAt,
             orderedAt: $orderedAt,
             paid: true,
@@ -167,7 +171,7 @@ final class OrderCreatorTest extends TestCase
             ],
         ));
 
-        self::assertSame($employee, $order->getEmployee());
+        self::assertSame($user, $order->getUser());
         self::assertEquals($pickupAt, $order->getPickupAt());
         self::assertEquals($orderedAt, $order->getOrderedAt());
         self::assertSame('1000', $order->getOrderNumber());
@@ -236,14 +240,17 @@ final class OrderCreatorTest extends TestCase
 
     private function orderInput(string $customerName, PhoneNumber $customerPhone): OrderInput
     {
-        $employee = (new Employee())->setName('Counter Employee');
-        $this->entityManager->persist($employee);
-        $this->entityManager->flush();
+        $user = $this->userRepository->findOneBy(['email' => 'ce@example.com']);
+        if (!$user) {
+            $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
+            $this->entityManager->persist($user);
+            $this->entityManager->flush();
+        }
 
         return new OrderInput(
             customerName: $customerName,
             customerPhone: $customerPhone,
-            employee: $employee,
+            user: $user,
             pickupAt: new \DateTimeImmutable('2026-10-10 09:00:00'),
             orderedAt: new \DateTimeImmutable('2026-10-07 14:00:00'),
         );

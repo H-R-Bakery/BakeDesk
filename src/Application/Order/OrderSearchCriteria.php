@@ -13,7 +13,7 @@ final readonly class OrderSearchCriteria
         public ?\DateTimeImmutable $pickupDate = null,
         public ?OrderStatus $status = null,
         public bool $statusProvided = false,
-        public ?int $employeeId = null,
+        public ?int $userId = null,
         public ?\DateTimeImmutable $upcomingFrom = null,
     ) {
     }
@@ -23,6 +23,6 @@ final readonly class OrderSearchCriteria
         return '' === $this->query
             && null === $this->pickupDate
             && !$this->statusProvided
-            && null === $this->employeeId;
+            && null === $this->userId;
     }
 }

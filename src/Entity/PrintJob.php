@@ -296,4 +296,11 @@ class PrintJob
 
         return $this;
     }
+
+    public function __toString(): string
+    {
+        $documentType = null === $this->documentType ? 'document' : $this->documentType->value;
+
+        return sprintf('#%d — %s — %s', $this->id ?? 0, $documentType, $this->status->value);
+    }
 }

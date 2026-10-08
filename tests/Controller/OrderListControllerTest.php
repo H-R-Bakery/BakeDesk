@@ -6,7 +6,6 @@ namespace App\Tests\Controller;
 
 use App\Application\Order\BakeryClock;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -14,6 +13,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use App\Model\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -29,37 +29,11 @@ final class OrderListControllerTest extends WebTestCase
 
     private BakeryClock $bakeryClock;
 
-    private Employee $employee;
+    private User $user;
 
     private ProductType $productType;
 
     private Unit $unit;
-
-    protected function setUp(): void
-    {
-        $_ENV['DATABASE_URL'] = 'sqlite:///:memory:';
-        $_SERVER['DATABASE_URL'] = 'sqlite:///:memory:';
-
-        self::ensureKernelShutdown();
-        $this->client = static::createClient();
-        $this->client->disableReboot();
-        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
-        $this->bakeryClock = self::getContainer()->get(BakeryClock::class);
-
-        $metadata = array_map(
-            $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
-        );
-        (new SchemaTool($this->entityManager))->createSchema($metadata);
-
-        $this->employee = (new Employee())->setName('Alex Baker')->setSortOrder(10);
-        $this->productType = (new ProductType())->setName('Donuts')->setSortOrder(10);
-        $this->unit = (new Unit())->setName('Each')->setPackageUnit(true)->setSortOrder(10);
-        $this->entityManager->persist($this->employee);
-        $this->entityManager->persist($this->productType);
-        $this->entityManager->persist($this->unit);
-        $this->entityManager->flush();
-    }
 
     public function testDefaultListShowsOnlyUpcomingOpenOrdersInPickupOrder(): void
     {
@@ -84,6 +58,52 @@ final class OrderListControllerTest extends WebTestCase
         self::assertStringNotContainsString('1005', (string) $this->client->getResponse()->getContent());
     }
 
+    private function createOrder(
+        string $number,
+        \DateTimeImmutable $pickupAt,
+        string $customerName,
+        OrderStatus $status = OrderStatus::OPEN,
+        ?User $user = null,
+        bool $paid = false,
+        ?string $notes = null,
+        ?Customer $customer = null,
+        string $phone = '+18125550001',
+    ): Order {
+        $customer ??= $this->createCustomer($customerName, $phone);
+        $order = (new Order())
+            ->setOrderNumber($number)
+            ->setCustomer($customer)
+            ->setUser($user ?? $this->user)
+            ->setPickupAt($pickupAt)
+            ->setOrderedAt($this->bakeryClock->now())
+            ->setStatus($status)
+            ->setPaid($paid)
+            ->setNotes($notes);
+        $order->addItem(
+            (new OrderItem())
+                ->setProductType($this->productType)
+                ->setQuantity('2')
+                ->setUnit($this->unit)
+                ->setDescription('Glazed')
+                ->setSortOrder(0),
+        );
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        return $order;
+    }
+
+    private function createCustomer(string $name, string $phone): Customer
+    {
+        $customer = (new Customer())
+            ->setName($name)
+            ->setPhone(PhoneNumberUtil::getInstance()->parse($phone, 'US'));
+        $this->entityManager->persist($customer);
+        $this->entityManager->flush();
+
+        return $customer;
+    }
+
     public function testSearchUsesOrderNumberSnapshotNameAndPhone(): void
     {
         $today = $this->bakeryClock->today();
@@ -101,14 +121,14 @@ final class OrderListControllerTest extends WebTestCase
         self::assertSelectorTextContains('#orders-table', '2001');
     }
 
-    public function testPickupDateStatusAndEmployeeFiltersAreAppliedInDatabase(): void
+    public function testPickupDateStatusAndUserFiltersAreAppliedInDatabase(): void
     {
-        $secondEmployee = (new Employee())->setName('Jamie Cake')->setSortOrder(20);
-        $this->entityManager->persist($secondEmployee);
+        $secondUser = User::new(email: 'jc@example.com', name: 'Jamie Cake', employee: true)->setSortOrder(20);
+        $this->entityManager->persist($secondUser);
         $this->entityManager->flush();
         $today = $this->bakeryClock->today();
-        $this->createOrder('3001', $today->modify('+2 days')->setTime(9, 0), 'Open Date', employee: $this->employee);
-        $this->createOrder('3002', $today->modify('+2 days')->setTime(10, 0), 'Completed Date', OrderStatus::COMPLETED, employee: $secondEmployee);
+        $this->createOrder('3001', $today->modify('+2 days')->setTime(9, 0), 'Open Date', user: $this->user);
+        $this->createOrder('3002', $today->modify('+2 days')->setTime(10, 0), 'Completed Date', OrderStatus::COMPLETED, user: $secondUser);
         $this->createOrder('3003', $today->modify('+3 days')->setTime(9, 0), 'Cancelled Date', OrderStatus::CANCELLED);
 
         $this->client->request('GET', '/orders?pickupDate='.$today->modify('+2 days')->format('Y-m-d'));
@@ -120,12 +140,12 @@ final class OrderListControllerTest extends WebTestCase
         self::assertSelectorTextContains('#orders-table', '3002');
         self::assertStringNotContainsString('3001', (string) $this->client->getResponse()->getContent());
 
-        $this->client->request('GET', '/orders?employee='.$secondEmployee->getId());
+        $this->client->request('GET', '/orders?user='.$secondUser->getId());
         self::assertSelectorTextContains('#orders-table', '3002');
         self::assertStringNotContainsString('3001', (string) $this->client->getResponse()->getContent());
     }
 
-    public function testDetailShowsSnapshotsEmployeePaymentStatusNotesAndItems(): void
+    public function testDetailShowsSnapshotsUserPaymentStatusNotesAndItems(): void
     {
         $customer = $this->createCustomer('Original Name', '+18125550999');
         $order = $this->createOrder('4001', $this->bakeryClock->today()->modify('+1 day')->setTime(11, 30), 'Original Name', paid: true, notes: 'Call when ready', customer: $customer);
@@ -165,49 +185,29 @@ final class OrderListControllerTest extends WebTestCase
         self::assertStringContainsString('No orders matched your search.', (string) $this->client->getResponse()->getContent());
     }
 
-    private function createOrder(
-        string $number,
-        \DateTimeImmutable $pickupAt,
-        string $customerName,
-        OrderStatus $status = OrderStatus::OPEN,
-        ?Employee $employee = null,
-        bool $paid = false,
-        ?string $notes = null,
-        ?Customer $customer = null,
-        string $phone = '+18125550001',
-    ): Order {
-        $customer ??= $this->createCustomer($customerName, $phone);
-        $order = (new Order())
-            ->setOrderNumber($number)
-            ->setCustomer($customer)
-            ->setEmployee($employee ?? $this->employee)
-            ->setPickupAt($pickupAt)
-            ->setOrderedAt($this->bakeryClock->now())
-            ->setStatus($status)
-            ->setPaid($paid)
-            ->setNotes($notes);
-        $order->addItem(
-            (new OrderItem())
-                ->setProductType($this->productType)
-                ->setQuantity('2')
-                ->setUnit($this->unit)
-                ->setDescription('Glazed')
-                ->setSortOrder(0),
-        );
-        $this->entityManager->persist($order);
-        $this->entityManager->flush();
-
-        return $order;
-    }
-
-    private function createCustomer(string $name, string $phone): Customer
+    protected function setUp(): void
     {
-        $customer = (new Customer())
-            ->setName($name)
-            ->setPhone(PhoneNumberUtil::getInstance()->parse($phone, 'US'));
-        $this->entityManager->persist($customer);
-        $this->entityManager->flush();
+        $_ENV['DATABASE_URL'] = 'sqlite:///:memory:';
+        $_SERVER['DATABASE_URL'] = 'sqlite:///:memory:';
 
-        return $customer;
+        self::ensureKernelShutdown();
+        $this->client = static::createClient();
+        $this->client->disableReboot();
+        $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->bakeryClock = self::getContainer()->get(BakeryClock::class);
+
+        $metadata = array_map(
+            $this->entityManager->getClassMetadata(...),
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+        );
+        (new SchemaTool($this->entityManager))->createSchema($metadata);
+
+        $this->user = User::new(email: 'ab@example.com', name: 'Alex Baker', employee: true)->setSortOrder(10);
+        $this->productType = (new ProductType())->setName('Donuts')->setSortOrder(10);
+        $this->unit = (new Unit())->setName('Each')->setPackageUnit(true)->setSortOrder(10);
+        $this->entityManager->persist($this->user);
+        $this->entityManager->persist($this->productType);
+        $this->entityManager->persist($this->unit);
+        $this->entityManager->flush();
     }
 }

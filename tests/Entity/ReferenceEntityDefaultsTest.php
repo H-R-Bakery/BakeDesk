@@ -3,9 +3,9 @@
 namespace App\Tests\Entity;
 
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use PHPUnit\Framework\TestCase;
 
 final class ReferenceEntityDefaultsTest extends TestCase
@@ -19,14 +19,14 @@ final class ReferenceEntityDefaultsTest extends TestCase
         self::assertInstanceOf(\DateTimeImmutable::class, $customer->getUpdatedAt());
     }
 
-    public function testEmployeeDefaults(): void
+    public function testUserDefaults(): void
     {
-        $employee = new Employee();
+        $user = new User();
 
-        self::assertTrue($employee->isActive());
-        self::assertSame(0, $employee->getSortOrder());
-        self::assertInstanceOf(\DateTimeImmutable::class, $employee->getCreatedAt());
-        self::assertInstanceOf(\DateTimeImmutable::class, $employee->getUpdatedAt());
+        self::assertTrue($user->isActive());
+        self::assertSame(0, $user->getSortOrder());
+        self::assertInstanceOf(\DateTimeImmutable::class, $user->getCreatedAt());
+        self::assertInstanceOf(\DateTimeImmutable::class, $user->getUpdatedAt());
     }
 
     public function testProductTypeDefaults(): void

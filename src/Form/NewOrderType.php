@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Form;
 
-use App\Entity\Employee;
+use App\Entity\User;
 use App\Form\Model\NewOrderData;
-use App\Repository\EmployeeRepository;
+use App\Repository\UserRepository;
 use Misd\PhoneNumberBundle\Form\Type\PhoneNumberType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -25,7 +25,7 @@ use Symfony\Component\Validator\Constraints\Count;
 final class NewOrderType extends AbstractType
 {
     public function __construct(
-        private EmployeeRepository $employeeRepository,
+        private UserRepository $userRepository,
         #[Autowire('%bakery_timezone%')]
         private string $bakeryTimezone,
     ) {
@@ -33,10 +33,10 @@ final class NewOrderType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $employees = $this->employeeRepository->findActiveOrdered();
+        $users = $this->userRepository->findActiveOrdered();
         if (true === $options['include_inactive'] && $options['data'] instanceof NewOrderData) {
-            if (null !== $options['data']->employee && !$options['data']->employee->isActive()) {
-                array_unshift($employees, $options['data']->employee);
+            if (null !== $options['data']->user && !$options['data']->user->isActive()) {
+                array_unshift($users, $options['data']->user);
             }
         }
 
@@ -64,15 +64,15 @@ final class NewOrderType extends AbstractType
                     'data-customer-autocomplete-target' => 'phone',
                 ],
             ])
-            ->add('employee', EntityType::class, [
-                'class' => Employee::class,
-                'choices' => $employees,
+            ->add('user', EntityType::class, [
+                'class' => User::class,
+                'choices' => $users,
                 'choice_label' => 'name',
                 'expanded' => true,
                 'multiple' => false,
                 'label' => 'Employee',
-                'choice_attr' => static fn (Employee $employee): array => [
-                    'data-employee-preference-target' => 'employee',
+                'choice_attr' => static fn (User $user): array => [
+                    'data-user-preference-target' => 'user',
                 ],
             ])
             ->add('pickupDate', DateType::class, [

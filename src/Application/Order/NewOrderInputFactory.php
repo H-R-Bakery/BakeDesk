@@ -24,7 +24,7 @@ final class NewOrderInputFactory
 
     public function createInput(NewOrderData $data): OrderInput
     {
-        if (null === $data->customerPhone || null === $data->employee || null === $data->pickupDate || null === $data->pickupTime) {
+        if (null === $data->customerPhone || null === $data->user || null === $data->pickupDate || null === $data->pickupTime) {
             throw new \LogicException('A valid order form is required.');
         }
 
@@ -50,7 +50,7 @@ final class NewOrderInputFactory
         return new OrderInput(
             customerName: trim($data->customerName),
             customerPhone: $data->customerPhone,
-            employee: $data->employee,
+            user: $data->user,
             pickupAt: $this->bakeryClock->combineDateAndTime($data->pickupDate, $data->pickupTime),
             orderedAt: $this->bakeryClock->now(),
             paid: $data->paid,

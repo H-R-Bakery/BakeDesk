@@ -2,18 +2,17 @@
 
 namespace App\Repository;
 
-use App\Entity\Employee;
+use App\Entity\User;
 
-/** @extends AbstractServiceEntityRepository<Employee> */
-class EmployeeRepository extends AbstractServiceEntityRepository
+class UserRepository extends AbstractServiceEntityRepository
 {
     public static function getEntityClass(): string
     {
-        return Employee::class;
+        return User::class;
     }
 
     /**
-     * @return list<Employee>
+     * @return list<User>
      */
     public function findActiveOrdered(): array
     {
@@ -21,7 +20,7 @@ class EmployeeRepository extends AbstractServiceEntityRepository
     }
 
     /**
-     * @return list<Employee>
+     * @return list<User>
      */
     public function findAllOrdered(): array
     {

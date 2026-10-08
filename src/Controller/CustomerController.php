@@ -21,10 +21,12 @@ final class CustomerController extends AbstractController
         $phoneUtil = PhoneNumberUtil::getInstance();
 
         return $this->json(array_map(static function ($customer) use ($phoneUtil): array {
+            $phone = $customer->getPhone();
+
             return [
                 'id' => $customer->getId(),
                 'name' => $customer->getName(),
-                'phone' => $phoneUtil->format($customer->getPhone(), PhoneNumberFormat::NATIONAL),
+                'phone' => null === $phone ? '' : $phoneUtil->format($phone, PhoneNumberFormat::NATIONAL),
             ];
         }, $customers));
     }

@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Printer;
 
+/** @extends AbstractServiceEntityRepository<Printer> */
 class PrinterRepository extends AbstractServiceEntityRepository
 {
     public static function getEntityClass(): string

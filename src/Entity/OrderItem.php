@@ -118,4 +118,9 @@ class OrderItem
 
         return $this;
     }
+
+    public function __toString(): string
+    {
+        return sprintf('%s %s %s — %s', $this->quantity, $this->unit?->getName() ?? 'Unit', $this->productType?->getName() ?? 'Product', $this->description);
+    }
 }

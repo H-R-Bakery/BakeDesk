@@ -3,14 +3,10 @@
 namespace App\Repository;
 
 use App\Entity\Unit;
-use App\Repository\AbstractServiceEntityRepository;
 
 /** @extends AbstractServiceEntityRepository<Unit> */
 class UnitRepository extends AbstractServiceEntityRepository
 {
-    /**
-     * @inheritDoc
-     */
     public static function getEntityClass(): string
     {
         return Unit::class;

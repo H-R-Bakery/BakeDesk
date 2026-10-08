@@ -30,7 +30,7 @@ final class OrderCreator
                 ->setCustomer($customer)
                 ->setCustomerName($input->customerName)
                 ->setCustomerPhone($input->customerPhone)
-                ->setEmployee($input->employee)
+                ->setUser($input->user)
                 ->setPickupAt($input->pickupAt)
                 ->setOrderedAt($input->orderedAt)
                 ->setPaid($input->paid)

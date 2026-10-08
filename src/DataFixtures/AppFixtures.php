@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\DataFixtures;
 
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\PackagingRule;
 use App\Entity\Printer;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use libphonenumber\PhoneNumberUtil;
@@ -77,13 +77,16 @@ final class AppFixtures extends Fixture
         }
 
         foreach ([
-            ['Cory Baker', true],
-            ['Adrienne Baker', true],
-            ['John Smith', true],
-        ] as [$name, $active]) {
-            $manager->persist((new Employee())
+            ['Cory Baker', 'cbaker@example.com', true, ['ROLE_ADMIN']],
+            ['Adrienne Baker', 'abaker@example.com', true, ['ROLE_ADMIN']],
+            ['John Smith', 'jsmith@example.com', true, []],
+        ] as [$name, $email, $active, $roles]) {
+            $manager->persist((new User())
+                ->setEmail($email)
                 ->setName($name)
                 ->setActive($active)
+                ->setRoles($roles)
+                ->setPlainPassword('asdf')
             );
         }
 

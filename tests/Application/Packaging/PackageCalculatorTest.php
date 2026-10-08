@@ -8,7 +8,6 @@ use App\Application\Packaging\FractionalPackageUnit;
 use App\Application\Packaging\MissingPackagingRule;
 use App\Application\Packaging\PackageCalculator;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -16,6 +15,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -34,7 +34,7 @@ final class PackageCalculatorTest extends KernelTestCase
         $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
         $this->calculator = self::getContainer()->get(PackageCalculator::class);

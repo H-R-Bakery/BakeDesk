@@ -11,6 +11,7 @@
         "doctrine/doctrine-bundle": "^3.3",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.7",
+        "easycorp/easyadmin-bundle": "^5.6",
         "gotenberg/gotenberg-php": "^2.25",
         "league/flysystem-bundle": "^3.7",
         "obray/ipp": "^1.6",

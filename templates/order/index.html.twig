@@ -36,11 +36,11 @@
                 </select>
             </div>
             <div class="col-12 col-sm-6 col-lg-2">
-                <label class="form-label" for="order-employee">Taken by</label>
-                <select class="form-select" id="order-employee" name="employee">
+                <label class="form-label" for="order-user">Taken by</label>
+                <select class="form-select" id="order-user" name="user">
                     <option value="">All employees</option>
-                    {% for employee in employees %}
-                        <option value="{{ employee.id }}"{{ employee_id == employee.id ? ' selected' : '' }}>{{ employee.name }}{% if not employee.active %} (inactive){% endif %}</option>
+                    {% for user in users %}
+                        <option value="{{ user.id }}"{{ user_id == user.id ? ' selected' : '' }}>{{ user.name }}{% if not user.active %} (inactive){% endif %}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -71,7 +71,7 @@
                         <th data-field="pickup" data-sortable="true">Pickup</th>
                         <th data-field="customer" data-sortable="true">Customer</th>
                         <th data-field="phone">Phone</th>
-                        <th data-field="employee" data-sortable="true">Taken by</th>
+                        <th data-field="user" data-sortable="true">Taken by</th>
                         <th data-field="items" data-sortable="true">Items</th>
                         <th data-field="paid">Paid</th>
                         <th data-field="status" data-sortable="true">Status</th>
@@ -85,7 +85,7 @@
                             <td data-sort-value="{{ order.pickupAt|date('Y-m-d H:i:s', bakery_timezone) }}"><span class="d-block">{{ order.pickupAt|date('D, M j', bakery_timezone) }}</span><span class="text-body-secondary">{{ order.pickupAt|date('g:i A', bakery_timezone) }}</span></td>
                             <td>{{ order.customerName }}</td>
                             <td>{{ order.customerPhone|phone_number_format('NATIONAL') }}</td>
-                            <td>{{ order.employee.name }}</td>
+                            <td>{{ order.user.name }}</td>
                             <td>{{ row.itemCount }} item{{ row.itemCount == 1 ? '' : 's' }}</td>
                             <td><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></td>
                             <td><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></td>

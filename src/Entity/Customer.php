@@ -25,9 +25,9 @@ class Customer
     #[ORM\Column(length: 255)]
     private string $name = '';
 
-    #[Assert\NotBlank]
+    #[Assert\NotNull]
     #[ORM\Column(type: 'phone_number', nullable: false)]
-    private PhoneNumber $phone;
+    private ?PhoneNumber $phone = null;
 
     public function __construct()
     {
@@ -63,7 +63,7 @@ class Customer
         return $phoneUtil->format($this->getPhone(), PhoneNumberFormat::E164);
     }
 
-    public function getPhone(): PhoneNumber
+    public function getPhone(): ?PhoneNumber
     {
         return $this->phone;
     }
@@ -85,5 +85,13 @@ class Customer
         $this->phone = $phoneUtil->parse($phone, $country);
 
         return $this;
+    }
+
+    public function __toString(): string
+    {
+        $phone = $this->getPhone();
+        $phoneLabel = null === $phone ? '' : ' — '.PhoneNumberUtil::getInstance()->format($phone, PhoneNumberFormat::NATIONAL);
+
+        return $this->name.$phoneLabel;
     }
 }

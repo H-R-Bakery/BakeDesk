@@ -39,19 +39,19 @@
     <section class="card shadow-sm mb-4" aria-labelledby="order-information-heading">
         <div class="card-body">
             <h2 class="h5 card-title" id="order-information-heading">Order information</h2>
-            <div class="mb-3" data-controller="employee-preference">
-                {{ form_label(form.employee) }}
+            <div class="mb-3" data-controller="user_preference">
+                {{ form_label(form.user) }}
                 <div class="d-flex flex-wrap gap-3 mt-2">
-                    {% for employee in form.employee %}
+                    {% for user in form.user %}
                         <div class="form-check form-check-inline">
-                            {{ form_widget(employee) }}
-                            {{ form_label(employee) }}
+                            {{ form_widget(user) }}
+                            {{ form_label(user) }}
                         </div>
                     {% else %}
                         <p class="text-body-secondary mb-0">No active employees are available.</p>
                     {% endfor %}
                 </div>
-                {{ form_errors(form.employee) }}
+                {{ form_errors(form.user) }}
             </div>
             <div class="row g-3">
                 <div class="col-12 col-md-4">

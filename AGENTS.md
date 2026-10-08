@@ -37,6 +37,10 @@ The public ordering and production-report interfaces do not currently require au
 
 The `/admin` area must require authentication.
 
+EasyAdmin is used only for secured administrator-managed reference and configuration data.
+The normal bakery operational UI remains purpose-built and unauthenticated for V1.
+PackagingRules and Printers are managed through the administration area.
+
 ---
 
 ## Core domain
@@ -44,7 +48,7 @@ The `/admin` area must require authentication.
 The initial domain consists of:
 
 - `Customer`
-- `Employee`
+- `User`
 - `Order`
 - `OrderItem`
 - `ProductType`
@@ -65,7 +69,6 @@ Use PHP enums for internal workflow/state values.
 
 Do **not** use enums for administrator-managed reference data such as:
 
-- employees
 - product types
 - units
 - printers
@@ -148,15 +151,6 @@ The browser should remember the most recently selected employee using browser-lo
 This preference is browser-specific and is not an authenticated-user preference.
 
 If the previously remembered employee is inactive or no longer exists, it must not be automatically selected.
-
-Employees are administrator-managed entities.
-
-Likely initial fields include:
-
-- name
-- active
-- sort order
-- optional future external/Toast identifier
 
 Do not require employee authentication for order entry.
 

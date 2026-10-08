@@ -18,7 +18,6 @@ use App\Application\Printing\PrintJobState;
 use App\Application\Printing\PrintJobStatusSnapshot;
 use App\Application\Printing\PrintSubmission;
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -26,6 +25,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use App\Message\ProcessPrintJob;
 use App\Message\RefreshPrintJobStatus;
 use App\MessageHandler\ProcessPrintJobHandler;
@@ -63,7 +63,7 @@ final class PrintJobPipelineTest extends KernelTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
         $this->printJobRepository = self::getContainer()->get(PrintJobRepository::class);
@@ -566,11 +566,11 @@ final class PrintJobPipelineTest extends KernelTestCase
     {
         $phone = PhoneNumberUtil::getInstance()->parse('+18125551234', 'US');
         $customer = (new Customer())->setName('Snapshot Customer')->setPhone($phone);
-        $employee = (new Employee())->setName('Counter Employee');
+        $user = User::new(email: 'ce@example.com', name: 'Counter Employee', employee: true);
         $productType = (new ProductType())->setName('Donuts');
         $unit = (new Unit())->setName('Dozen')->setPackageUnit(true);
         $this->entityManager->persist($customer);
-        $this->entityManager->persist($employee);
+        $this->entityManager->persist($user);
         $this->entityManager->persist($productType);
         $this->entityManager->persist($unit);
         $this->entityManager->flush();
@@ -580,7 +580,7 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setCustomer($customer)
             ->setCustomerName('Snapshot Customer')
             ->setCustomerPhone($phone)
-            ->setEmployee($employee)
+            ->setUser($user)
             ->setPickupAt(new \DateTimeImmutable('2026-10-10 09:30:00'))
             ->setOrderedAt(new \DateTimeImmutable('2026-10-08 12:00:00'));
         $order->addItem(

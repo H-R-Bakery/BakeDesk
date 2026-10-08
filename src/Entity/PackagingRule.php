@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\UniqueConstraint(
     name: 'uniq_packaging_rule_product_unit_active',
     columns: ['product_type_id', 'unit_id', 'active'],
-    options: ['where' => 'active = TRUE'],
+    options: ['where' => '(active = true)'],
 )]
 #[ORM\Index(name: 'idx_packaging_rule_product_unit', columns: ['product_type_id', 'unit_id'])]
 class PackagingRule
@@ -97,5 +97,10 @@ class PackagingRule
                 ->atPath('unit')
                 ->addViolation();
         }
+    }
+
+    public function __toString(): string
+    {
+        return sprintf('%s / %s — %s per package', $this->productType?->getName() ?? 'Product type', $this->unit?->getName() ?? 'Unit', $this->quantityPerPackage);
     }
 }

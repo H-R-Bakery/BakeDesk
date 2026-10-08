@@ -13,60 +13,62 @@ use Doctrine\Persistence\ManagerRegistry;
  *
  * @noinspection PhpUndefinedClassInspection
  *
- * @method T|null find($id, $lockMode = null, $lockVersion = null)
- * @method T|null findOneBy(array $criteria, array $orderBy = null)
- * @method T[] findAll()
- * @method T[] findBy(array $criteria, array $orderBy = null, $limit = null, $offset = null)
+ * @extends ServiceEntityRepository<T>
+ *
+ * @method T|null  find(mixed $id, ?int $lockMode = null, ?int $lockVersion = null)
+ * @method T|null  findOneBy(array<string, mixed> $criteria, ?array<string, string> $orderBy = null)
+ * @method list<T> findAll()
+ * @method list<T> findBy(array<string, mixed> $criteria, ?array<string, string> $orderBy = null, ?int $limit = null, ?int $offset = null)
  */
 abstract class AbstractServiceEntityRepository extends ServiceEntityRepository
 {
-	public function __construct(ManagerRegistry $registry)
-	{
-		parent::__construct($registry, static::getEntityClass());
-	}
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, static::getEntityClass());
+    }
 
-	/**
-	 * @return class-string<T>
-	 */
-	abstract public static function getEntityClass(): string;
+    /**
+     * @return class-string<T>
+     */
+    abstract public static function getEntityClass(): string;
 
-	/**
-	 * @param object<T> $entity
-	 */
-	public function save(object $entity, bool $flush = false): void
-	{
-		$this->getEntityManager()->persist($entity);
+    /**
+     * @param T $entity
+     */
+    public function save(object $entity, bool $flush = false): void
+    {
+        $this->getEntityManager()->persist($entity);
 
-		if ($flush) {
-			$this->getEntityManager()->flush();
-		}
-	}
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 
-	/**
-	 * @param object<T> $entity
-	 */
-	public function remove(object $entity, bool $flush = false): void
-	{
-		$this->getEntityManager()->remove($entity);
+    /**
+     * @param T $entity
+     */
+    public function remove(object $entity, bool $flush = false): void
+    {
+        $this->getEntityManager()->remove($entity);
 
-		if ($flush) {
-			$this->getEntityManager()->flush();
-		}
-	}
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 
-	/**
-	 * @param object<T> $entity
-	 *
-	 * @return object<T>
-	 */
-	public function refresh(object $entity): object
-	{
-		try {
-			$this->getEntityManager()->refresh($entity);
-		} catch (ORMException) {
-			return $entity;
-		}
+    /**
+     * @param T $entity
+     *
+     * @return T
+     */
+    public function refresh(object $entity): object
+    {
+        try {
+            $this->getEntityManager()->refresh($entity);
+        } catch (ORMException) {
+            return $entity;
+        }
 
-		return $entity;
-	}
+        return $entity;
+    }
 }

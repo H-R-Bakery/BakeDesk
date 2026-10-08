@@ -17,7 +17,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(name: 'idx_bakery_order_pickup_at', columns: ['pickup_at'])]
 #[ORM\Index(name: 'idx_bakery_order_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_bakery_order_customer', columns: ['customer_id'])]
-#[ORM\Index(name: 'idx_bakery_order_employee', columns: ['employee_id'])]
+#[ORM\Index(name: 'idx_bakery_order_user', columns: ['user_id'])]
 class Order
 {
     use TimestampableTrait;
@@ -47,7 +47,7 @@ class Order
     #[Assert\NotNull]
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private ?Employee $employee = null;
+    private ?User $user = null;
 
     #[Assert\NotNull]
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
@@ -105,9 +105,14 @@ class Order
 
     public function setCustomer(Customer $customer): static
     {
+        $phone = $customer->getPhone();
+        if (null === $phone) {
+            throw new \InvalidArgumentException('A customer must have a phone number.');
+        }
+
         $this->customer = $customer;
         $this->customerName = $customer->getName();
-        $this->customerPhone = clone $customer->getPhone();
+        $this->customerPhone = clone $phone;
 
         return $this;
     }
@@ -136,14 +141,14 @@ class Order
         return $this;
     }
 
-    public function getEmployee(): ?Employee
+    public function getUser(): ?User
     {
-        return $this->employee;
+        return $this->user;
     }
 
-    public function setEmployee(Employee $employee): static
+    public function setUser(User $user): static
     {
-        $this->employee = $employee;
+        $this->user = $user;
 
         return $this;
     }
@@ -241,5 +246,10 @@ class Order
         }
 
         return $this;
+    }
+
+    public function __toString(): string
+    {
+        return $this->orderNumber;
     }
 }

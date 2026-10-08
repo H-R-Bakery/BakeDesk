@@ -25,12 +25,12 @@ class OrderRepository extends AbstractServiceEntityRepository
         $pageSize = min(max(1, $pageSize), 100);
 
         $queryBuilder = $this->createFilteredQueryBuilder($criteria)
-            ->leftJoin('o.employee', 'employee')
-            ->addSelect('employee')
+            ->leftJoin('o.user', 'user')
+            ->addSelect('user')
             ->leftJoin('o.items', 'item')
             ->addSelect('COUNT(item.id) AS itemCount')
             ->groupBy('o.id')
-            ->addGroupBy('employee.id')
+            ->addGroupBy('user.id')
             ->orderBy('o.pickupAt', 'ASC')
             ->addOrderBy('o.orderNumber', 'ASC')
             ->setFirstResult(($page - 1) * $pageSize)
@@ -55,8 +55,8 @@ class OrderRepository extends AbstractServiceEntityRepository
     public function findForDetail(int $id): ?Order
     {
         return $this->createQueryBuilder('o')
-            ->leftJoin('o.employee', 'employee')
-            ->addSelect('employee')
+            ->leftJoin('o.user', 'user')
+            ->addSelect('user')
             ->leftJoin('o.items', 'item')
             ->addSelect('item')
             ->leftJoin('item.productType', 'productType')
@@ -111,10 +111,10 @@ class OrderRepository extends AbstractServiceEntityRepository
                 ->setParameter('pickupDateEnd', $criteria->pickupDate->modify('+1 day'), Types::DATETIME_IMMUTABLE);
         }
 
-        if (null !== $criteria->employeeId) {
+        if (null !== $criteria->userId) {
             $queryBuilder
-                ->andWhere('IDENTITY(o.employee) = :employeeId')
-                ->setParameter('employeeId', $criteria->employeeId);
+                ->andWhere('IDENTITY(o.user) = :userId')
+                ->setParameter('userId', $criteria->userId);
         }
 
         return $queryBuilder;

@@ -21,9 +21,9 @@ use App\Entity\Order;
 use App\Form\Model\NewOrderData;
 use App\Form\NewOrderType;
 use App\Model\OrderStatus;
-use App\Repository\EmployeeRepository;
 use App\Repository\OrderRepository;
 use App\Repository\PrintJobRepository;
+use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -99,7 +99,7 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/orders', name: 'order_index', methods: ['GET'])]
-    public function index(Request $request, OrderRepository $orderRepository, EmployeeRepository $employeeRepository, BakeryClock $bakeryClock): Response
+    public function index(Request $request, OrderRepository $orderRepository, UserRepository $userRepository, BakeryClock $bakeryClock): Response
     {
         $query = trim((string) $request->query->get('q', ''));
         $pickupDateValue = trim((string) $request->query->get('pickupDate', ''));
@@ -107,14 +107,14 @@ final class OrderController extends AbstractController
         $statusValue = strtolower(trim((string) $request->query->get('status', '')));
         $statusProvided = $request->query->has('status');
         $status = '' !== $statusValue && 'all' !== $statusValue ? OrderStatus::tryFrom($statusValue) : null;
-        $employeeIdValue = filter_var($request->query->get('employee'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $employeeId = false === $employeeIdValue ? null : $employeeIdValue;
+        $userIdValue = filter_var($request->query->get('user'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $userId = false === $userIdValue ? null : $userIdValue;
         $criteria = new OrderSearchCriteria(
             query: $query,
             pickupDate: $pickupDate,
             status: $status,
             statusProvided: $statusProvided,
-            employeeId: $employeeId,
+            userId: $userId,
             upcomingFrom: $bakeryClock->today(),
         );
         $page = max(1, (int) $request->query->get('page', 1));
@@ -134,8 +134,8 @@ final class OrderController extends AbstractController
             'query' => $query,
             'pickup_date' => $pickupDateValue,
             'status' => $statusValue,
-            'employee_id' => $employeeId,
-            'employees' => $employeeRepository->findAllOrdered(),
+            'user_id' => $userId,
+            'users' => $userRepository->findAllOrdered(),
             'is_default_upcoming' => $criteria->isDefaultUpcoming(),
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);

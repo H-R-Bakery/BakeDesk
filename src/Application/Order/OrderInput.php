@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Order;
 
 use App\Entity\Customer;
-use App\Entity\Employee;
+use App\Entity\User;
 use libphonenumber\PhoneNumber;
 
 final readonly class OrderInput
@@ -16,7 +16,7 @@ final readonly class OrderInput
     public function __construct(
         public string $customerName,
         public PhoneNumber $customerPhone,
-        public Employee $employee,
+        public User $user,
         public \DateTimeImmutable $pickupAt,
         public \DateTimeImmutable $orderedAt,
         public bool $paid = false,

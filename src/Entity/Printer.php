@@ -5,12 +5,13 @@ namespace App\Entity;
 use App\Repository\PrinterRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ORM\Entity(repositoryClass: PrinterRepository::class)]
 #[ORM\UniqueConstraint(
     name: 'uniq_printer_default_for_labels',
     columns: ['default_for_labels'],
-    options: ['where' => 'default_for_labels = TRUE'],
+    options: ['where' => '(default_for_labels = true)'],
 )]
 class Printer
 {
@@ -127,5 +128,26 @@ class Printer
         $this->forReports = $forReports;
 
         return $this;
+    }
+
+    #[Assert\Callback]
+    public function validateConfiguration(ExecutionContextInterface $context): void
+    {
+        if ($this->defaultForLabels && !$this->forLabels) {
+            $context->buildViolation('A default label printer must support labels.')
+                ->atPath('defaultForLabels')
+                ->addViolation();
+        }
+
+        if ($this->defaultForLabels && !$this->isActive()) {
+            $context->buildViolation('A default label printer must be active.')
+                ->atPath('defaultForLabels')
+                ->addViolation();
+        }
+    }
+
+    public function __toString(): string
+    {
+        return $this->name;
     }
 }

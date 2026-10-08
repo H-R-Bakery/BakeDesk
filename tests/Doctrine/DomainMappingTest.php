@@ -3,7 +3,6 @@
 namespace App\Tests\Doctrine;
 
 use App\Entity\Customer;
-use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
@@ -11,6 +10,7 @@ use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
+use App\Entity\User;
 use App\Model\OrderStatus;
 use App\Model\PrintDocumentType;
 use App\Model\PrintJobStatus;
@@ -27,12 +27,12 @@ final class DomainMappingTest extends KernelTestCase
         $entityManager = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = array_map(
             $entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
 
         self::assertSame([], (new SchemaValidator($entityManager))->validateMapping());
 
-        self::assertSame(['customer', 'employee', 'product_type', 'unit', 'bakery_order', 'order_item', 'packaging_rule', 'printer', 'print_job'], array_map(
+        self::assertSame(['customer', 'users', 'product_type', 'unit', 'bakery_order', 'order_item', 'packaging_rule', 'printer', 'print_job'], array_map(
             static fn ($entityMetadata): string => $entityMetadata->getTableName(),
             $metadata,
         ));

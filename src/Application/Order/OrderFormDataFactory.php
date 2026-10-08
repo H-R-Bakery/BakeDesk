@@ -19,9 +19,9 @@ final class OrderFormDataFactory
     {
         $pickupAt = $order->getPickupAt();
         $customerPhone = $order->getCustomerPhone();
-        $employee = $order->getEmployee();
+        $user = $order->getUser();
 
-        if (null === $pickupAt || null === $customerPhone || null === $employee) {
+        if (null === $pickupAt || null === $customerPhone || null === $user) {
             throw new \LogicException('An order must have complete details before it can be edited.');
         }
 
@@ -31,7 +31,7 @@ final class OrderFormDataFactory
         $data->customerName = $order->getCustomerName();
         $data->customerId = $order->getCustomer()?->getId();
         $data->customerPhone = clone $customerPhone;
-        $data->employee = $employee;
+        $data->user = $user;
         $data->pickupDate = $pickupAt;
         $data->pickupTime = $pickupAt;
         $data->paid = $order->isPaid();

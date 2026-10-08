@@ -21,7 +21,8 @@ final class CustomerResolver
     {
         if (null !== $selectedCustomer && $selectedCustomer->isActive()) {
             $phoneUtil = PhoneNumberUtil::getInstance();
-            if ($phoneUtil->format($selectedCustomer->getPhone(), PhoneNumberFormat::E164) === $phoneUtil->format($phone, PhoneNumberFormat::E164)) {
+            $selectedPhone = $selectedCustomer->getPhone();
+            if (null !== $selectedPhone && $phoneUtil->format($selectedPhone, PhoneNumberFormat::E164) === $phoneUtil->format($phone, PhoneNumberFormat::E164)) {
                 return $selectedCustomer;
             }
         }

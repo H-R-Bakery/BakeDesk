@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Form\Model;
 
-use App\Entity\Employee;
+use App\Entity\User;
 use libphonenumber\PhoneNumber;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -23,8 +23,8 @@ final class NewOrderData
     #[Assert\NotNull(message: 'Enter a valid customer phone number.')]
     public ?PhoneNumber $customerPhone = null;
 
-    #[Assert\NotNull(message: 'Choose the employee taking the order.')]
-    public ?Employee $employee = null;
+    #[Assert\NotNull(message: 'Choose the user taking the order.')]
+    public ?User $user = null;
 
     #[Assert\NotNull(message: 'Choose a pickup date.')]
     public ?\DateTimeImmutable $pickupDate = null;

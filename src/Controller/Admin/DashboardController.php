@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller\Admin;
+
+use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
+use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
+
+#[AdminDashboard(routePath: '/admin', routeName: 'admin')]
+#[IsGranted('ROLE_ADMIN')]
+final class DashboardController extends AbstractDashboardController
+{
+    public function index(): Response
+    {
+        return $this->render('admin/dashboard.html.twig');
+    }
+
+    public function configureDashboard(): Dashboard
+    {
+        return Dashboard::new()->setTitle('BakeDesk');
+    }
+
+    public function configureMenuItems(): iterable
+    {
+        yield MenuItem::linkToDashboard('Dashboard', 'fa fa-home');
+        yield MenuItem::section('Administration');
+        yield MenuItem::linkTo(UserCrudController::class, 'Users', 'fa fa-user-tie');
+        yield MenuItem::linkTo(CustomerCrudController::class, 'Customers', 'fa fa-users');
+        yield MenuItem::linkTo(ProductTypeCrudController::class, 'Product Types', 'fa fa-cookie-bite');
+        yield MenuItem::linkTo(UnitCrudController::class, 'Units', 'fa fa-box');
+        yield MenuItem::linkTo(PackagingRuleCrudController::class, 'Packaging Rules', 'fa fa-boxes-stacked');
+        yield MenuItem::linkTo(PrinterCrudController::class, 'Printers', 'fa fa-print');
+        yield MenuItem::linkTo(PrintJobCrudController::class, 'Print Jobs', 'fa fa-list-check');
+        yield MenuItem::section();
+        yield MenuItem::linkToRoute('Back to BakeDesk', 'fa fa-arrow-left', 'order_new');
+    }
+}

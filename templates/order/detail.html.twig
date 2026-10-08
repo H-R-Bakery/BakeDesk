@@ -29,7 +29,7 @@
                 <dt class="col-sm-3">Pickup</dt>
                 <dd class="col-sm-9">{{ order.pickupAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
                 <dt class="col-sm-3">Taken by</dt>
-                <dd class="col-sm-9">{{ order.employee.name }}</dd>
+                <dd class="col-sm-9">{{ order.user.name }}</dd>
                 <dt class="col-sm-3">Ordered at</dt>
                 <dd class="col-sm-9">{{ order.orderedAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
                 <dt class="col-sm-3">Payment</dt>
