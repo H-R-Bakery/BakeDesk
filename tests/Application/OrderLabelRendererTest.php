@@ -62,7 +62,8 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('(812) 555-1234', $renderedHtml);
         self::assertStringContainsString('Sat, Oct 10', $renderedHtml);
         self::assertStringContainsString('9:30 AM', $renderedHtml);
-        self::assertStringContainsString('Paid', $renderedHtml);
+        self::assertStringContainsString('payment-paid', $renderedHtml);
+        self::assertMatchesRegularExpression('/class="payment payment-paid">\s*PAID\s*<\/div>/', $renderedHtml);
         self::assertStringContainsString('Order #1234', $renderedHtml);
         self::assertStringContainsString('Counter Employee', $renderedHtml);
         self::assertStringContainsString('2 Dozen', $renderedHtml);
@@ -70,8 +71,88 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('1 Box', $renderedHtml);
         self::assertStringContainsString('Brownies', $renderedHtml);
         self::assertTrue(strpos($renderedHtml, '>Donuts<') < strpos($renderedHtml, '>Brownies<'));
+        self::assertStringContainsString('class="label-top"', $renderedHtml);
+        self::assertStringContainsString('class="label-bottom"', $renderedHtml);
+        self::assertMatchesRegularExpression('/\.label-bottom\s*\{.*?top:\s*4in;/s', $renderedHtml);
+        self::assertMatchesRegularExpression('/\.fold-line\s*\{.*?top:\s*4in;/s', $renderedHtml);
+        self::assertStringContainsString('class="payment payment-paid"', $renderedHtml);
+        $logo = file_get_contents(dirname(__DIR__, 2).'/assets/Images/HRBakeryLogo_bw.svg');
+        self::assertIsString($logo);
+        self::assertStringContainsString($logo, $renderedHtml);
         self::assertStringNotContainsString('Current Customer', $renderedHtml);
         self::assertStringNotContainsString('(812) 555-9999', $renderedHtml);
+    }
+
+    public function testUnpaidLabelUsesBlackBackgroundAndWhiteText(): void
+    {
+        $renderedHtml = $this->renderLabel($this->createOrder()->setPaid(false));
+
+        self::assertStringContainsString('class="payment payment-unpaid"', $renderedHtml);
+        self::assertMatchesRegularExpression('/class="payment payment-unpaid">\s*NOT PAID\s*<\/div>/', $renderedHtml);
+        self::assertStringContainsString('background: #000;', $renderedHtml);
+        self::assertStringContainsString('color: #fff;', $renderedHtml);
+    }
+
+    public function testTooMuchItemContentFailsBeforePdfRendering(): void
+    {
+        self::bootKernel();
+
+        $pdfRenderer = $this->createMock(DocumentRendererInterface::class);
+        $pdfRenderer->expects(self::never())->method('renderHtmlToPdf');
+        $storage = $this->createMock(FilesystemOperator::class);
+        $storage->expects(self::never())->method('write');
+
+        $order = $this->createOrder();
+        for ($sortOrder = 30; $sortOrder <= 90; $sortOrder += 10) {
+            $order->addItem(
+                (new OrderItem())
+                    ->setProductType((new ProductType())->setName('Cookies'))
+                    ->setQuantity('1')
+                    ->setUnit((new Unit())->setName('Each'))
+                    ->setDescription('A deliberately long description that cannot fit in the fixed label item area.')
+                    ->setSortOrder($sortOrder),
+            );
+        }
+
+        $renderer = new OrderLabelRenderer(
+            self::getContainer()->get(Environment::class),
+            $pdfRenderer,
+            $storage,
+            new BakeryClock('America/Indiana/Indianapolis'),
+            new NullLogger(),
+        );
+
+        $this->expectException(\App\Application\Document\OrderLabelRenderingException::class);
+        $renderer->render($order);
+    }
+
+    private function renderLabel(Order $order): string
+    {
+        self::bootKernel();
+
+        $renderedHtml = '';
+        $pdfRenderer = $this->createMock(DocumentRendererInterface::class);
+        $pdfRenderer
+            ->expects(self::once())
+            ->method('renderHtmlToPdf')
+            ->willReturnCallback(function (string $html) use (&$renderedHtml): string {
+                $renderedHtml = $html;
+
+                return '%PDF-1.7 test label';
+            });
+
+        $storage = $this->createStub(FilesystemOperator::class);
+        $renderer = new OrderLabelRenderer(
+            self::getContainer()->get(Environment::class),
+            $pdfRenderer,
+            $storage,
+            new BakeryClock('America/Indiana/Indianapolis'),
+            new NullLogger(),
+        );
+
+        $renderer->render($order);
+
+        return $renderedHtml;
     }
 
     private function createOrder(): Order

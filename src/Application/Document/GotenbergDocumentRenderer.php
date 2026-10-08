@@ -28,6 +28,7 @@ final class GotenbergDocumentRenderer implements DocumentRendererInterface
             ->paperSize('4in', '6in')
             ->margins('0', '0', '0', '0')
             ->preferCssPageSize()
+            ->printBackground()
             ->html(Stream::string('index.html', $html));
 
         return Gotenberg::send($request, $this->httpClient)->getBody()->getContents();

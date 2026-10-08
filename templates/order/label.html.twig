@@ -3,19 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        :root {
+            --logo-width: 2.65in;
+            --logo-height: 0.42in;
+        }
+
         @page {
             size: 4in 6in;
             margin: 0;
+            border: 1px solid #000;
         }
 
-        * {
+        *,
+        *::before,
+        *::after {
             box-sizing: border-box;
         }
 
         html,
         body {
             width: 4in;
-            min-height: 6in;
+            height: 6in;
             margin: 0;
             padding: 0;
         }
@@ -25,142 +33,265 @@
             background: #fff;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 10pt;
-            line-height: 1.2;
-            padding: 0.18in;
+            line-height: 1.1;
+            overflow: hidden;
         }
 
         .label {
-            min-height: 5.64in;
+            position: relative;
+            width: 4in;
+            height: 6in;
+            overflow: hidden;
         }
 
-        .customer-name {
-            font-size: 20pt;
-            font-weight: 700;
-            line-height: 1.05;
-            overflow-wrap: anywhere;
+        .label-top,
+        .label-bottom {
+            position: absolute;
+            left: 0;
+            width: 4in;
         }
 
-        .phone,
-        .secondary {
-            font-size: 9pt;
+        .label-top {
+            top: 0;
+            height: 4in;
+            padding: 0.14in 0.16in 0.12in;
+            overflow: hidden;
         }
 
-        .phone {
-            margin-top: 0.04in;
+        .label-bottom {
+            top: 4in;
+            height: 2in;
+            padding: 0.14in 0.16in 0.12in;
         }
 
-        .pickup {
-            border-top: 2px solid #000;
-            margin-top: 0.16in;
-            padding-top: 0.10in;
-        }
-
-        .eyebrow {
-            font-size: 8pt;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        }
-
-        .pickup-line {
-            align-items: baseline;
+        .logo {
+            align-items: center;
             display: flex;
-            gap: 0.10in;
-            justify-content: space-between;
-            margin-top: 0.03in;
+            height: var(--logo-height);
+            justify-content: center;
+            width: 100%;
         }
 
-        .pickup-date,
-        .pickup-time {
-            font-size: 14pt;
-            font-weight: 700;
-        }
-
-        .payment {
-            font-size: 15pt;
-            font-weight: 700;
-            margin-top: 0.12in;
-            text-transform: uppercase;
+        .logo svg {
+            display: block;
+            height: auto;
+            max-height: var(--logo-height);
+            max-width: 100%;
+            width: var(--logo-width);
         }
 
         .items {
-            border-bottom: 2px solid #000;
             border-top: 2px solid #000;
-            margin-top: 0.13in;
-            padding: 0.06in 0;
+            /*height: 2.92in;*/
+            margin-top: 0.05in;
+            overflow: hidden;
+            padding: 0.05in 0.02in;
+            position: absolute;
+            left: 0.16in;
+            right: 0.16in;
+            /*top: 0.88in;*/
         }
 
         .item {
             break-inside: avoid;
             page-break-inside: avoid;
-            padding: 0.04in 0;
+            padding: 0.025in 0;
         }
 
         .item-heading {
-            display: flex;
-            font-size: 11pt;
+            display: grid;
+            font-size: 10.5pt;
             font-weight: 700;
-            gap: 0.07in;
+            grid-template-columns: 01.0in minmax(0, 1fr);
+            line-height: 1.05;
         }
 
         .item-quantity {
-            min-width: 0.82in;
+            min-width: 0;
+            text-wrap: nowrap;
+            overflow: hidden;
+            margin-right: 0.05in;
+        }
+
+        .item-product::before {
+            content: '\2014\00a0';
         }
 
         .item-description {
-            font-size: 10pt;
-            margin-left: 0.89in;
+            font-size: 9.5pt;
+            line-height: 1.1;
+            margin-left: 0.86in;
             overflow-wrap: anywhere;
         }
 
-        .footer {
-            padding-top: 0.10in;
+        .fold-line {
+            border-top: 2px dashed #000;
+            left: 0;
+            position: absolute;
+            top: 4in;
+            transform: translateY(-1px);
+            width: 4in;
+            z-index: 2;
+        }
+
+        .bottom-main {
+            display: flex;
+            gap: 0.12in;
+            height: 1.26in;
+        }
+
+        .customer {
+            min-width: 0;
+            width: 2.20in;
+        }
+
+        .pickup {
+            min-width: 0;
+            width: 1.20in;
+        }
+
+        .eyebrow {
+            font-size: 7.5pt;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .customer-name {
+            font-size: 19pt;
+            font-weight: 700;
+            line-height: 1.02;
+            margin-top: 0.04in;
+            overflow-wrap: anywhere;
+        }
+
+        .customer-name-long {
+            font-size: 15pt;
+        }
+
+        .customer-name-very-long {
+            font-size: 12pt;
+        }
+
+        .phone {
+            font-size: 10pt;
+            line-height: 1.05;
+            margin-top: 0.04in;
+            white-space: nowrap;
+        }
+
+        .pickup-date,
+        .pickup-time {
+            font-weight: 700;
+            line-height: 1.05;
+            white-space: nowrap;
+        }
+
+        .pickup-date {
+            font-size: 12pt;
+            margin-top: 0.09in;
+        }
+
+        .pickup-time {
+            font-size: 15pt;
+            margin-top: 0.04in;
+        }
+
+        .metadata {
+            bottom: 0.12in;
+            font-size: 7.5pt;
+            left: 0.16in;
+            line-height: 1.15;
+            max-width: 2.12in;
+            overflow-wrap: anywhere;
+            position: absolute;
         }
 
         .order-number {
-            font-size: 11pt;
+            font-size: 9pt;
             font-weight: 700;
         }
 
         .secondary {
-            margin-top: 0.03in;
+            margin-top: 0.025in;
+        }
+
+        .payment {
+            align-items: center;
+            bottom: 0.12in;
+            display: flex;
+            font-size: 13pt;
+            font-weight: 700;
+            height: 0.47in;
+            justify-content: center;
+            line-height: 1;
+            position: absolute;
+            right: 0.16in;
+            text-align: center;
+            text-transform: uppercase;
+            white-space: nowrap;
+            width: 1.26in;
+        }
+
+        .payment-paid {
+            background: #fff;
+            border: 2px solid #000;
+            color: #000;
+        }
+
+        .payment-unpaid {
+            background: #000;
+            color: #fff;
         }
     </style>
+    <title></title>
 </head>
 <body>
     <main class="label">
-        <header>
-            <div class="customer-name">{{ order.customerName }}</div>
-            <div class="phone">{{ order.customerPhone|phone_number_format('NATIONAL') }}</div>
-        </header>
+        <section class="label-top" aria-label="Order items">
+            <div class="logo" aria-label="H&amp;R Bakery logo">{{ logo_svg|raw }}</div>
 
-        <section class="pickup" aria-label="Pickup">
-            <div class="eyebrow">Pickup</div>
-            <div class="pickup-line">
-                <div class="pickup-date">{{ pickup_at|date('D, M j', bakery_timezone) }}</div>
-                <div class="pickup-time">{{ pickup_at|date('g:i A', bakery_timezone) }}</div>
+            <div class="items">
+                {% for item in items %}
+                    <article class="item">
+                        <div class="item-heading">
+                            <span class="item-quantity">{{ item.quantity }} {{ item.unit.name }}</span>
+                            <span class="item-product">{{ item.productType.name }}</span>
+                        </div>
+                        <div class="item-description">{{ item.description }}</div>
+                    </article>
+                {% endfor %}
             </div>
         </section>
 
-        <div class="payment">{{ order.paid ? 'Paid' : 'Not Paid' }}</div>
+        <div class="fold-line" aria-hidden="true"></div>
 
-        <section class="items" aria-label="Order items">
-            {% for item in items %}
-                <article class="item">
-                    <div class="item-heading">
-                        <span class="item-quantity">{{ item.quantity }} {{ item.unit.name }}</span>
-                        <span>{{ item.productType.name }}</span>
-                    </div>
-                    <div class="item-description">{{ item.description }}</div>
-                </article>
-            {% endfor %}
+        <section class="label-bottom" aria-label="Customer and pickup details">
+            <div class="bottom-main">
+                <div class="customer">
+                    <div class="eyebrow">Customer</div>
+                    <div class="customer-name{% if order.customerName|length > 32 %} customer-name-long{% endif %}{% if order.customerName|length > 64 %} customer-name-very-long{% endif %}">{{ order.customerName }}</div>
+                    <div class="phone">{{ order.customerPhone|phone_number_format('NATIONAL') }}</div>
+                </div>
+
+                <div class="pickup">
+                    <div class="eyebrow">Pickup</div>
+                    <div class="pickup-date">{{ pickup_at|date('D, M j', bakery_timezone) }}</div>
+                    <div class="pickup-time">{{ pickup_at|date('g:i A', bakery_timezone) }}</div>
+                </div>
+            </div>
+
+            <div class="metadata">
+                <div class="order-number">Order #{{ order.orderNumber }}</div>
+                <div class="secondary">Taken by {{ order.employee.name }}</div>
+                <div class="secondary">Ordered {{ ordered_at|date('M j, Y, g:i A', bakery_timezone) }}</div>
+            </div>
+
+            <div class="payment {{ order.paid ? 'payment-paid' : 'payment-unpaid' }}">
+                {{ order.paid ? 'PAID' : 'NOT PAID' }}
+            </div>
         </section>
-
-        <footer class="footer">
-            <div class="order-number">Order #{{ order.orderNumber }}</div>
-            <div class="secondary">Taken by {{ order.employee.name }}</div>
-            <div class="secondary">Ordered {{ ordered_at|date('M j, Y, g:i A', bakery_timezone) }}</div>
-        </footer>
     </main>
 </body>
 </html>
