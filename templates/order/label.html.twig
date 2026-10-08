@@ -4,12 +4,35 @@
     <meta charset="UTF-8">
     <style>
         :root {
+            --label-width: 4in;
+            --label-top-height: 4in;
+            --label-bottom-height: 2in;
+            --label-height: calc(var(--label-top-height) + var(--label-bottom-height));
+            --label-fold-position: var(--label-top-height);
+            --label-horizontal-padding: 0.16in;
+            --label-section-padding-top: 0.14in;
+            --label-section-padding-bottom: 0.12in;
             --logo-width: 2.65in;
             --logo-height: 0.42in;
+            --items-top: 0.88in;
+            --items-height: 2.92in;
+            --items-padding-block: 0.05in;
+            --items-padding-inline: 0.02in;
+            --item-padding-block: 0.025in;
+            --item-quantity-column-width: 1in;
+            --item-description-offset: 0.86in;
+            --item-quantity-margin-right: 0.05in;
+            --bottom-main-gap: 0.12in;
+            --bottom-main-height: 1.26in;
+            --bottom-content-offset: 0.12in;
+            --fold-line-thickness: 2px;
+            --fold-line-offset: -1px;
+            --payment-width: 1.26in;
+            --payment-height: 0.47in;
         }
 
         @page {
-            size: 4in 6in;
+            size: var(--label-width) var(--label-height);
             margin: 0;
             border: 1px solid #000;
         }
@@ -22,8 +45,8 @@
 
         html,
         body {
-            width: 4in;
-            height: 6in;
+            width: var(--label-width);
+            height: var(--label-height);
             margin: 0;
             padding: 0;
         }
@@ -39,8 +62,8 @@
 
         .label {
             position: relative;
-            width: 4in;
-            height: 6in;
+            width: var(--label-width);
+            height: var(--label-height);
             overflow: hidden;
         }
 
@@ -48,20 +71,21 @@
         .label-bottom {
             position: absolute;
             left: 0;
-            width: 4in;
+            width: var(--label-width);
         }
 
         .label-top {
             top: 0;
-            height: 4in;
-            padding: 0.14in 0.16in 0.12in;
+            height: var(--label-top-height);
+            padding: var(--label-section-padding-top) var(--label-horizontal-padding) var(--label-section-padding-bottom);
             overflow: hidden;
         }
 
         .label-bottom {
             top: 4in;
-            height: 2in;
-            padding: 0.14in 0.16in 0.12in;
+            top: var(--label-fold-position);
+            height: var(--label-bottom-height);
+            padding: var(--label-section-padding-top) var(--label-horizontal-padding) var(--label-section-padding-bottom);
         }
 
         .logo {
@@ -82,27 +106,26 @@
 
         .items {
             border-top: 2px solid #000;
-            /*height: 2.92in;*/
-            margin-top: 0.05in;
+            height: var(--items-height);
+            left: var(--label-horizontal-padding);
             overflow: hidden;
-            padding: 0.05in 0.02in;
+            padding: var(--items-padding-block) var(--items-padding-inline);
             position: absolute;
-            left: 0.16in;
-            right: 0.16in;
-            /*top: 0.88in;*/
+            right: var(--label-horizontal-padding);
+            top: var(--items-top);
         }
 
         .item {
             break-inside: avoid;
             page-break-inside: avoid;
-            padding: 0.025in 0;
+            padding: var(--item-padding-block) 0;
         }
 
         .item-heading {
             display: grid;
             font-size: 10.5pt;
             font-weight: 700;
-            grid-template-columns: 01.0in minmax(0, 1fr);
+            grid-template-columns: var(--item-quantity-column-width) minmax(0, 1fr);
             line-height: 1.05;
         }
 
@@ -110,7 +133,7 @@
             min-width: 0;
             text-wrap: nowrap;
             overflow: hidden;
-            margin-right: 0.05in;
+            margin-right: var(--item-quantity-margin-right);
         }
 
         .item-product::before {
@@ -120,24 +143,25 @@
         .item-description {
             font-size: 9.5pt;
             line-height: 1.1;
-            margin-left: 0.86in;
+            margin-left: var(--item-description-offset);
             overflow-wrap: anywhere;
         }
 
         .fold-line {
-            border-top: 2px dashed #000;
+            border-top: var(--fold-line-thickness) dashed #000;
             left: 0;
             position: absolute;
             top: 4in;
-            transform: translateY(-1px);
-            width: 4in;
+            top: var(--label-fold-position);
+            transform: translateY(var(--fold-line-offset));
+            width: var(--label-width);
             z-index: 2;
         }
 
         .bottom-main {
             display: flex;
-            gap: 0.12in;
-            height: 1.26in;
+            gap: var(--bottom-main-gap);
+            height: var(--bottom-main-height);
         }
 
         .customer {
@@ -199,7 +223,7 @@
         }
 
         .metadata {
-            bottom: 0.12in;
+            bottom: var(--bottom-content-offset);
             font-size: 7.5pt;
             left: 0.16in;
             line-height: 1.15;
@@ -219,19 +243,19 @@
 
         .payment {
             align-items: center;
-            bottom: 0.12in;
+            bottom: var(--bottom-content-offset);
             display: flex;
             font-size: 13pt;
             font-weight: 700;
-            height: 0.47in;
+            height: var(--payment-height);
             justify-content: center;
             line-height: 1;
             position: absolute;
-            right: 0.16in;
+            right: var(--label-horizontal-padding);
             text-align: center;
             text-transform: uppercase;
             white-space: nowrap;
-            width: 1.26in;
+            width: var(--payment-width);
         }
 
         .payment-paid {
