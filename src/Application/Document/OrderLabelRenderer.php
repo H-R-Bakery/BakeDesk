@@ -39,7 +39,7 @@ final class OrderLabelRenderer
                 throw new \UnexpectedValueException('Gotenberg returned an invalid PDF document.');
             }
 
-            $filename = sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), bin2hex(random_bytes(8)));
+            $filename = sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), $this->safePhoneNumber($order));
             $path = sprintf(
                 'labels/%s/%s/%s',
                 $order->getPickupAt()?->format('Y') ?? $this->bakeryClock->now()->format('Y'),
@@ -74,6 +74,13 @@ final class OrderLabelRenderer
         $safeOrderNumber = preg_replace('/[^A-Za-z0-9_-]+/', '-', $order->getOrderNumber()) ?? '';
 
         return trim($safeOrderNumber, '-') ?: 'unknown';
+    }
+
+    private function safePhoneNumber(Order $order): string
+    {
+        $safePhoneNumber = preg_replace('/[^0-9]+/', '', $order->getCustomerPhone()->getNationalNumber()) ?? $order->getId();
+
+        return trim($safePhoneNumber);
     }
 
     private function asBakeryLocalDateTime(?\DateTimeImmutable $dateTime): ?\DateTimeImmutable
