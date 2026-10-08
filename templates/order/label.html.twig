@@ -14,7 +14,7 @@
             --label-section-padding-bottom: 0.12in;
             --logo-width: 2.65in;
             --logo-height: 0.42in;
-            --items-top: 0.88in;
+            --items-top: calc(var(--logo-height) + var(--label-section-padding-top) + 0.05in);
             --items-height: 2.92in;
             --items-padding-block: 0.05in;
             --items-padding-inline: 0.02in;
@@ -82,7 +82,6 @@
         }
 
         .label-bottom {
-            top: 4in;
             top: var(--label-fold-position);
             height: var(--label-bottom-height);
             padding: var(--label-section-padding-top) var(--label-horizontal-padding) var(--label-section-padding-bottom);
@@ -148,12 +147,14 @@
         }
 
         .package-count {
-            border-top: 2px solid #000;
-            font-size: 14pt;
+            bottom: 0.82in;
+            font-size: 11pt;
             font-weight: 700;
-            margin-top: 0.1in;
-            padding-top: 0.08in;
+            left: var(--label-horizontal-padding);
+            position: absolute;
+            right: var(--label-horizontal-padding);
             text-align: center;
+            white-space: nowrap;
         }
 
         .fold-line {
@@ -295,9 +296,6 @@
                         </div>
                         <div class="item-description">{{ item.description }}</div>
                     </article>
-                    {% if package.packageCount > 1 %}
-                        <div class="package-count">BOX {{ package.packageNumber }} OF {{ package.packageCount }}</div>
-                    {% endif %}
                 {% else %}
                     {% for item in items %}
                         <article class="item">
@@ -327,6 +325,10 @@
                     <div class="pickup-date">{{ pickup_at|date('D, M j', bakery_timezone) }}</div>
                     <div class="pickup-time">{{ pickup_at|date('g:i A', bakery_timezone) }}</div>
                 </div>
+            </div>
+
+            <div class="package-count">
+                BOX {{ package ? package.packageNumber : 1 }} OF {{ package ? package.packageCount : 1 }}
             </div>
 
             <div class="metadata">
