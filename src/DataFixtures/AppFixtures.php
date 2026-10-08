@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DataFixtures;
 
 use App\Entity\Customer;
+use App\Entity\Employee;
 use App\Entity\Printer;
 use App\Entity\ProductType;
 use App\Entity\Unit;
@@ -57,6 +58,17 @@ final class AppFixtures extends Fixture
                 ->setName($name)
                 ->setActive($active)
                 ->setPhone($phoneUtil->parse($phone))
+            );
+        }
+
+        foreach ([
+            ['Cory Baker', true],
+            ['Adrienne Baker', true],
+            ['John Smith', true],
+        ] as [$name, $active, $phone]) {
+            $manager->persist((new Employee())
+                ->setName($name)
+                ->setActive($active)
             );
         }
 

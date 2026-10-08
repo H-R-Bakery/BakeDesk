@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c3260c1631cbdde62f97fd514d175cdb",
+    "content-hash": "9ecf9e990ac44f056c0f4afc30434e8c",
     "packages": [
         {
             "name": "composer/semver",
@@ -1969,6 +1969,43 @@
                 }
             ],
             "time": "2026-09-29T19:21:12+00:00"
+        },
+        {
+            "name": "obray/ipp",
+            "version": "v1.6.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nateobray/IPP.git",
+                "reference": "e1f724bba55fd1ebce8c56775d4a86b9514054ae"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nateobray/IPP/zipball/e1f724bba55fd1ebce8c56775d4a86b9514054ae",
+                "reference": "e1f724bba55fd1ebce8c56775d4a86b9514054ae",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.6"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "obray\\ipp\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "description": "A PHP implemntation of the Internet Printing Protocol (IPP)",
+            "support": {
+                "issues": "https://github.com/nateobray/IPP/issues",
+                "source": "https://github.com/nateobray/IPP/tree/v1.6.0"
+            },
+            "time": "2026-04-13T16:48:10+00:00"
         },
         {
             "name": "odolbeau/phone-number-bundle",
@@ -12675,6 +12712,7 @@
     "platform": {
         "php": ">=8.4",
         "ext-ctype": "*",
+        "ext-curl": "*",
         "ext-iconv": "*"
     },
     "platform-dev": {},

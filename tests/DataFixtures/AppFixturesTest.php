@@ -17,7 +17,7 @@ final class AppFixturesTest extends TestCase
         $persisted = [];
         $manager = $this->createMock(ObjectManager::class);
         $manager
-            ->expects(self::exactly(9))
+            ->expects(self::exactly(14))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;

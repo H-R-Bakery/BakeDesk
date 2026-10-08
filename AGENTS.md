@@ -24,7 +24,7 @@ These architectural decisions have already been made. Do not replace them with a
 - PostgreSQL as the application database.
 - Server-rendered Twig pages.
 - Stimulus and Turbo where they improve the UI.
-- Redis for Symfony Messenger.
+- Valkey, the Redis-compatible service, for Symfony Messenger.
 - Mercure for realtime browser updates.
 - EasyAdmin for the secured administration area.
 - Docker Compose for application infrastructure.
@@ -332,6 +332,8 @@ Order controllers, report controllers, and Messenger handlers must not contain r
 
 Printing-related responsibilities should be separated so that another IPP implementation can be substituted later.
 
+BakeDesk performs IPP printing through the selected PHP IPP client behind `PrinterClientInterface`. The configured printer address remains the complete direct or CUPS IPP URI.
+
 ### Label document rendering and storage
 
 Gotenberg 8 is the application PDF rendering service for HTML documents, using the official `gotenberg/gotenberg-php` client.
@@ -360,8 +362,9 @@ Expected flow:
 7. A Messenger worker processes the print job.
 8. The worker renders the document.
 9. The worker submits it to the configured IPP printer.
-10. Print status changes are persisted to PostgreSQL.
-11. Relevant status changes may be published through Mercure.
+10. The worker records the accepted external IPP job identifier and asynchronously refreshes its status.
+11. Print status changes are persisted to PostgreSQL.
+12. Relevant status changes may be published through Mercure.
 
 Never put Doctrine entities directly into Messenger messages.
 
@@ -373,7 +376,7 @@ Messenger messages should contain scalar identifiers, such as a `PrintJob` ID.
 
 `PrintJob` is durable application state stored in PostgreSQL.
 
-Redis is only the queue transport and is not the source of truth for print history.
+Valkey is only the queue transport and is not the source of truth for print history.
 
 A print job should retain enough information to diagnose a failed print attempt.
 
@@ -384,7 +387,7 @@ Likely information includes:
 - status
 - associated order when applicable
 - report parameters when applicable
-- external CUPS/IPP job identifier when available
+- external IPP job identifier when available
 - attempt count
 - created timestamp
 - started timestamp
@@ -411,13 +414,13 @@ Meaning:
 
 - `QUEUED`: persisted and waiting for a Messenger worker
 - `PROCESSING`: worker is preparing/rendering the document
-- `SUBMITTED`: document was accepted by the printer/IPP subsystem
+- `SUBMITTED`: document submission was accepted by the printer/IPP subsystem; physical completion may still be unknown
 - `COMPLETED`: printer subsystem reported successful completion
 - `FAILED`: processing or printing failed
 - `CANCELLED`: job was intentionally cancelled
 - `RENDERED`: the application generated and stored the document; no printer submission has occurred yet.
 
-Do not assume every printer can reliably report physical print completion.
+Document submission and physical completion are distinct states. Do not assume every printer can reliably report physical print completion.
 
 For some printers, `SUBMITTED` may be the strongest reliable success indication.
 
@@ -429,7 +432,7 @@ UI wording must not claim physical printing occurred unless the underlying print
 
 Use Symfony Messenger for asynchronous printing.
 
-Redis is the intended Messenger transport.
+Valkey is the intended Messenger transport.
 
 Printing should have its own transport/queue.
 
@@ -439,7 +442,7 @@ Do not introduce RabbitMQ or another queue system unless specifically requested.
 
 Use Symfony's retry facilities rather than implementing hand-written retry loops.
 
-Retries for physical printing should remain conservative to avoid unexpected duplicate labels.
+Retries for physical printing should remain conservative to avoid unexpected duplicate labels. Avoid blindly resubmitting when a network failure leaves the IPP acceptance outcome unknown; duplicate-print avoidance is more important than an automatic retry.
 
 Application-level `PrintJob` state remains authoritative even when Messenger retries occur.
 
@@ -617,7 +620,7 @@ Expected containerized services include, as applicable:
 - web server
 - Messenger worker
 - PostgreSQL
-- Redis
+- Valkey
 - Mercure
 
 CUPS remains on the Raspberry Pi host because it is hardware-facing.

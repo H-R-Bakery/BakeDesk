@@ -7,9 +7,15 @@ namespace App\Tests\Application\Printing;
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
+use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrinterResolver;
 use App\Application\Printing\LabelPrintJobCreator;
+use App\Application\Printing\PrinterClientInterface;
+use App\Application\Printing\PrinterSubmissionException;
+use App\Application\Printing\PrintJobState;
+use App\Application\Printing\PrintJobStatusSnapshot;
+use App\Application\Printing\PrintSubmission;
 use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
@@ -19,7 +25,9 @@ use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Message\ProcessPrintJob;
+use App\Message\RefreshPrintJobStatus;
 use App\MessageHandler\ProcessPrintJobHandler;
+use App\MessageHandler\RefreshPrintJobStatusHandler;
 use App\Model\PrintDocumentType;
 use App\Model\PrintJobStatus;
 use App\Repository\PrinterRepository;
@@ -167,7 +175,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertNull($printJob->getDocumentPath());
     }
 
-    public function testHandlerRendersStoresLogicalPathAndDoesNotSubmit(): void
+    public function testHandlerRendersStoresLogicalPathAndSubmitsOnce(): void
     {
         $this->createDefaultPrinter();
         $order = $this->createOrder();
@@ -197,29 +205,53 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->createStub(LoggerInterface::class),
         );
 
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient
+            ->expects(self::once())
+            ->method('submitPdf')
+            ->with(
+                self::isInstanceOf(Printer::class),
+                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#'),
+                'BakeDesk Order #1234',
+            )
+            ->willReturn(new PrintSubmission('42', new PrintJobStatusSnapshot(PrintJobState::PENDING)));
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus
+            ->expects(self::once())
+            ->method('dispatch')
+            ->with(self::callback(static fn (object $message): bool => $message instanceof RefreshPrintJobStatus && 0 === $message->checkNumber))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
         (new ProcessPrintJobHandler(
             $this->entityManager,
             $this->printJobRepository,
             $labelRenderer,
             self::getContainer()->get(BakeryClock::class),
+            $printerClient,
+            new IppJobStateMapper(),
+            $messageBus,
             $this->createStub(LoggerInterface::class),
         ))(new ProcessPrintJob($printJob->getId()));
 
         $this->entityManager->clear();
         $stored = $this->printJobRepository->find($printJob->getId());
         self::assertInstanceOf(PrintJob::class, $stored);
-        self::assertSame(PrintJobStatus::RENDERED, $stored->getStatus());
+        self::assertSame(PrintJobStatus::SUBMITTED, $stored->getStatus());
         self::assertSame(1, $stored->getAttemptCount());
         self::assertMatchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#', (string) $stored->getDocumentPath());
-        self::assertNull($stored->getSubmittedAt());
+        self::assertNotNull($stored->getSubmittedAt());
+        self::assertSame('42', $stored->getExternalJobId());
         self::assertNull($stored->getCompletedAt());
 
-        // Redelivery of an already rendered job does not create a second document.
+        // Redelivery after IPP acceptance does not create a second document or submission.
         (new ProcessPrintJobHandler(
             $this->entityManager,
             $this->printJobRepository,
             $labelRenderer,
             self::getContainer()->get(BakeryClock::class),
+            $printerClient,
+            new IppJobStateMapper(),
+            $this->createStub(MessageBusInterface::class),
             $this->createStub(LoggerInterface::class),
         ))(new ProcessPrintJob($printJob->getId()));
     }
@@ -255,6 +287,9 @@ final class PrintJobPipelineTest extends KernelTestCase
                 $this->printJobRepository,
                 $labelRenderer,
                 self::getContainer()->get(BakeryClock::class),
+                $this->createStub(PrinterClientInterface::class),
+                new IppJobStateMapper(),
+                $this->createStub(MessageBusInterface::class),
                 $this->createStub(LoggerInterface::class),
             ))(new ProcessPrintJob($printJob->getId()));
         } finally {
@@ -286,6 +321,9 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->printJobRepository,
             $labelRenderer,
             self::getContainer()->get(BakeryClock::class),
+            $this->createStub(PrinterClientInterface::class),
+            new IppJobStateMapper(),
+            $this->createStub(MessageBusInterface::class),
             $this->createStub(LoggerInterface::class),
         );
 
@@ -303,6 +341,115 @@ final class PrintJobPipelineTest extends KernelTestCase
             self::assertSame($status, $printJob->getStatus());
             self::assertSame(0, $printJob->getAttemptCount());
         }
+    }
+
+    public function testSubmittedJobCompletionIsPersisted(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::SUBMITTED)
+            ->setExternalJobId('42')
+            ->setOrder($order);
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient->expects(self::once())->method('getJobStatus')->with($printer, '42')->willReturn(
+            new PrintJobStatusSnapshot(PrintJobState::COMPLETED, ['job-completed-successfully']),
+        );
+        $handler = new RefreshPrintJobStatusHandler(
+            $this->printJobRepository,
+            $this->entityManager,
+            $printerClient,
+            new IppJobStateMapper(),
+            self::getContainer()->get(BakeryClock::class),
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $handler(new RefreshPrintJobStatus($printJob->getId()));
+
+        self::assertSame(PrintJobStatus::COMPLETED, $printJob->getStatus());
+        self::assertNotNull($printJob->getCompletedAt());
+    }
+
+    public function testNonTerminalJobRemainsSubmittedAndSchedulesARefresh(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::SUBMITTED)
+            ->setExternalJobId('42')
+            ->setOrder($order);
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient->expects(self::once())->method('getJobStatus')->willReturn(new PrintJobStatusSnapshot(PrintJobState::PROCESSING));
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::callback(static fn (object $message): bool => $message instanceof RefreshPrintJobStatus && 2 === $message->checkNumber))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $handler = new RefreshPrintJobStatusHandler(
+            $this->printJobRepository,
+            $this->entityManager,
+            $printerClient,
+            new IppJobStateMapper(),
+            self::getContainer()->get(BakeryClock::class),
+            $messageBus,
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $handler(new RefreshPrintJobStatus($printJob->getId(), 1));
+
+        self::assertSame(PrintJobStatus::SUBMITTED, $printJob->getStatus());
+    }
+
+    public function testAmbiguousSubmissionFailsWithoutMakingASecondAttemptPossible(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::RENDERED)
+            ->setDocumentPath('labels/2026/10/order-1234.pdf')
+            ->setOrder($order);
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient->expects(self::once())->method('submitPdf')->willThrowException(
+            PrinterSubmissionException::outcomeUnknown(new \RuntimeException('connection closed')),
+        );
+        $labelRenderer = new OrderLabelRenderer(
+            self::getContainer()->get(Environment::class),
+            $this->createStub(DocumentRendererInterface::class),
+            $this->createStub(FilesystemOperator::class),
+            self::getContainer()->get(BakeryClock::class),
+            $this->createStub(LoggerInterface::class),
+        );
+        $handler = new ProcessPrintJobHandler(
+            $this->entityManager,
+            $this->printJobRepository,
+            $labelRenderer,
+            self::getContainer()->get(BakeryClock::class),
+            $printerClient,
+            new IppJobStateMapper(),
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $handler(new ProcessPrintJob($printJob->getId()));
+
+        self::assertSame(PrintJobStatus::FAILED, $printJob->getStatus());
+        self::assertStringContainsString('unknown', strtolower((string) $printJob->getErrorMessage()));
+        self::assertSame('labels/2026/10/order-1234.pdf', $printJob->getDocumentPath());
     }
 
     private function createDefaultPrinter(): Printer

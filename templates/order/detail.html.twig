@@ -4,6 +4,7 @@
 
 {% block body %}
     {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}
+    {% set print_status_labels = {queued: 'Queued', processing: 'Rendering', rendered: 'Rendered', submitted: 'Sent to printer', completed: 'Completed', failed: 'Failed', cancelled: 'Cancelled'} %}
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
             <p class="text-body-secondary mb-1"><a href="{{ path('order_index') }}">Orders</a></p>
@@ -36,6 +37,15 @@
                 <dd class="col-sm-9"><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></dd>
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9"><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></dd>
+                {% if label_print_job %}
+                    <dt class="col-sm-3">Label printing</dt>
+                    <dd class="col-sm-9">
+                        <span class="badge text-bg-{{ label_print_job.status.value == 'failed' ? 'danger' : (label_print_job.status.value == 'completed' ? 'success' : 'secondary') }}">{{ print_status_labels[label_print_job.status.value] }}</span>
+                        {% if label_print_job.status.value == 'failed' and label_print_job.errorMessage %}
+                            <span class="text-body-secondary ms-2">{{ label_print_job.errorMessage }}</span>
+                        {% endif %}
+                    </dd>
+                {% endif %}
                 {% if order.notes %}
                     <dt class="col-sm-3">Notes</dt>
                     <dd class="col-sm-9">{{ order.notes }}</dd>

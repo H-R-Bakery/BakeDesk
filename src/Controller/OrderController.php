@@ -20,6 +20,7 @@ use App\Form\NewOrderType;
 use App\Model\OrderStatus;
 use App\Repository\EmployeeRepository;
 use App\Repository\OrderRepository;
+use App\Repository\PrintJobRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -127,7 +128,7 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/orders/{id<\d+>}', name: 'order_detail', methods: ['GET'])]
-    public function detail(int $id, OrderRepository $orderRepository, BakeryClock $bakeryClock): Response
+    public function detail(int $id, OrderRepository $orderRepository, PrintJobRepository $printJobRepository, BakeryClock $bakeryClock): Response
     {
         $order = $orderRepository->findForDetail($id);
         if (!$order instanceof Order) {
@@ -136,6 +137,7 @@ final class OrderController extends AbstractController
 
         return $this->render('order/detail.html.twig', [
             'order' => $order,
+            'label_print_job' => $printJobRepository->findLatestLabelForOrder($order),
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
     }
