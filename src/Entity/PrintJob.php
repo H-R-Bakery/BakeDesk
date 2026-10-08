@@ -14,6 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(name: 'idx_print_job_created_at', columns: ['created_at'])]
 #[ORM\Index(name: 'idx_print_job_printer', columns: ['printer_id'])]
 #[ORM\Index(name: 'idx_print_job_order', columns: ['order_id'])]
+#[ORM\Index(name: 'idx_print_job_order_item', columns: ['order_item_id'])]
 class PrintJob
 {
     #[ORM\Id]
@@ -37,6 +38,22 @@ class PrintJob
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
     private ?Order $order = null;
+
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?OrderItem $orderItem = null;
+
+    #[Assert\Positive]
+    #[ORM\Column(nullable: true)]
+    private ?int $packageNumber = null;
+
+    #[Assert\Positive]
+    #[ORM\Column(nullable: true)]
+    private ?int $packageCount = null;
+
+    #[Assert\Positive]
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    private ?string $packageQuantity = null;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $reportDate = null;
@@ -120,6 +137,54 @@ class PrintJob
     public function setOrder(?Order $order): static
     {
         $this->order = $order;
+
+        return $this;
+    }
+
+    public function getOrderItem(): ?OrderItem
+    {
+        return $this->orderItem;
+    }
+
+    public function setOrderItem(?OrderItem $orderItem): static
+    {
+        $this->orderItem = $orderItem;
+
+        return $this;
+    }
+
+    public function getPackageNumber(): ?int
+    {
+        return $this->packageNumber;
+    }
+
+    public function setPackageNumber(?int $packageNumber): static
+    {
+        $this->packageNumber = $packageNumber;
+
+        return $this;
+    }
+
+    public function getPackageCount(): ?int
+    {
+        return $this->packageCount;
+    }
+
+    public function setPackageCount(?int $packageCount): static
+    {
+        $this->packageCount = $packageCount;
+
+        return $this;
+    }
+
+    public function getPackageQuantity(): ?string
+    {
+        return $this->packageQuantity;
+    }
+
+    public function setPackageQuantity(?string $packageQuantity): static
+    {
+        $this->packageQuantity = $packageQuantity;
 
         return $this;
     }

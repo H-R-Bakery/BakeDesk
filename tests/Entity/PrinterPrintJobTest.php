@@ -3,6 +3,7 @@
 namespace App\Tests\Entity;
 
 use App\Entity\Order;
+use App\Entity\OrderItem;
 use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Model\PrintDocumentType;
@@ -83,5 +84,20 @@ final class PrinterPrintJobTest extends TestCase
 
         self::assertSame('2026-10-07', $printJob->getReportDate()?->format('Y-m-d'));
         self::assertInstanceOf(\DateTimeImmutable::class, $printJob->getReportDate());
+    }
+
+    public function testPackageMetadataCanBeStoredOnAQueuedLabelJob(): void
+    {
+        $item = (new OrderItem())->setUnit((new \App\Entity\Unit())->setName('Each'));
+        $printJob = (new PrintJob())
+            ->setOrderItem($item)
+            ->setPackageNumber(2)
+            ->setPackageCount(3)
+            ->setPackageQuantity('6');
+
+        self::assertSame($item, $printJob->getOrderItem());
+        self::assertSame(2, $printJob->getPackageNumber());
+        self::assertSame(3, $printJob->getPackageCount());
+        self::assertSame('6', $printJob->getPackageQuantity());
     }
 }

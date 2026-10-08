@@ -9,6 +9,7 @@ use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
+use App\Entity\PackagingRule;
 use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
@@ -47,13 +48,13 @@ final class OrderListControllerTest extends WebTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, Printer::class, PrintJob::class],
+            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
 
         $this->employee = (new Employee())->setName('Alex Baker')->setSortOrder(10);
         $this->productType = (new ProductType())->setName('Donuts')->setSortOrder(10);
-        $this->unit = (new Unit())->setName('Each')->setSortOrder(10);
+        $this->unit = (new Unit())->setName('Each')->setPackageUnit(true)->setSortOrder(10);
         $this->entityManager->persist($this->employee);
         $this->entityManager->persist($this->productType);
         $this->entityManager->persist($this->unit);

@@ -147,6 +147,15 @@
             overflow-wrap: anywhere;
         }
 
+        .package-count {
+            border-top: 2px solid #000;
+            font-size: 14pt;
+            font-weight: 700;
+            margin-top: 0.1in;
+            padding-top: 0.08in;
+            text-align: center;
+        }
+
         .fold-line {
             border-top: var(--fold-line-thickness) dashed #000;
             left: 0;
@@ -273,19 +282,33 @@
 </head>
 <body>
     <main class="label">
-        <section class="label-top" aria-label="Order items">
+        <section class="label-top" aria-label="Package contents">
             <div class="logo" aria-label="H&amp;R Bakery logo">{{ logo_svg|raw }}</div>
 
             <div class="items">
-                {% for item in items %}
+                {% if package %}
+                    {% set item = package.orderItem %}
                     <article class="item">
                         <div class="item-heading">
-                            <span class="item-quantity">{{ item.quantity }} {{ item.unit.name }}</span>
+                            <span class="item-quantity">{{ package.quantity }} {{ package.unit.name }}</span>
                             <span class="item-product">{{ item.productType.name }}</span>
                         </div>
                         <div class="item-description">{{ item.description }}</div>
                     </article>
-                {% endfor %}
+                    {% if package.packageCount > 1 %}
+                        <div class="package-count">BOX {{ package.packageNumber }} OF {{ package.packageCount }}</div>
+                    {% endif %}
+                {% else %}
+                    {% for item in items %}
+                        <article class="item">
+                            <div class="item-heading">
+                                <span class="item-quantity">{{ item.quantity }} {{ item.unit.name }}</span>
+                                <span class="item-product">{{ item.productType.name }}</span>
+                            </div>
+                            <div class="item-description">{{ item.description }}</div>
+                        </article>
+                    {% endfor %}
+                {% endif %}
             </div>
         </section>
 

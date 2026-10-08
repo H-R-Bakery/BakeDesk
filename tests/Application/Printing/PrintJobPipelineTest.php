@@ -7,6 +7,7 @@ namespace App\Tests\Application\Printing;
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
+use App\Application\Packaging\OrderPackageCalculator;
 use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrinterResolver;
@@ -20,6 +21,7 @@ use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
+use App\Entity\PackagingRule;
 use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
@@ -61,7 +63,7 @@ final class PrintJobPipelineTest extends KernelTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, Printer::class, PrintJob::class],
+            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
         $this->printJobRepository = self::getContainer()->get(PrintJobRepository::class);
@@ -138,19 +140,19 @@ final class PrintJobPipelineTest extends KernelTestCase
         $this->entityManager->flush();
     }
 
-    public function testCreatorPersistsQueuedJobBeforeDispatchingOnlyItsIdentifier(): void
+    public function testCreatorPersistsOneQueuedJobPerPhysicalPackageAndDispatchesOnlyIdentifiers(): void
     {
         $printer = $this->createDefaultPrinter();
         $order = $this->createOrder();
-        $dispatchedJobId = null;
+        $dispatchedJobIds = [];
         $bus = $this->createMock(MessageBusInterface::class);
         $bus
-            ->expects(self::once())
+            ->expects(self::exactly(2))
             ->method('dispatch')
-            ->with(self::callback(function (object $message) use (&$dispatchedJobId): bool {
+            ->with(self::callback(function (object $message) use (&$dispatchedJobIds): bool {
                 self::assertInstanceOf(ProcessPrintJob::class, $message);
                 self::assertSame(['printJobId' => $message->printJobId], get_object_vars($message));
-                $dispatchedJobId = $message->printJobId;
+                $dispatchedJobIds[] = $message->printJobId;
 
                 return true;
             }))
@@ -160,19 +162,25 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->entityManager,
             $this->printJobRepository,
             new LabelPrinterResolver($this->printerRepository),
+            self::getContainer()->get(OrderPackageCalculator::class),
             $bus,
         );
-        $printJob = $creator->createAndDispatch($order);
+        $printJobs = $creator->createAndDispatch($order);
 
-        self::assertNotNull($printJob->getId());
-        self::assertSame($printJob->getId(), $dispatchedJobId);
-        $dispatchedJobId = $printJob->getId();
-        self::assertSame($printer, $printJob->getPrinter());
-        self::assertSame($order, $printJob->getOrder());
-        self::assertSame(PrintDocumentType::LABEL, $printJob->getDocumentType());
-        self::assertSame(PrintJobStatus::QUEUED, $printJob->getStatus());
-        self::assertSame(0, $printJob->getAttemptCount());
-        self::assertNull($printJob->getDocumentPath());
+        self::assertCount(2, $printJobs);
+        self::assertSame([1, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageNumber(), $printJobs));
+        self::assertSame([2, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageCount(), $printJobs));
+        self::assertSame(['1', '1'], array_map(static fn (PrintJob $printJob): ?string => $printJob->getPackageQuantity(), $printJobs));
+        self::assertSame(array_map(static fn (PrintJob $printJob): ?int => $printJob->getId(), $printJobs), $dispatchedJobIds);
+        foreach ($printJobs as $printJob) {
+            self::assertNotNull($printJob->getId());
+            self::assertSame($printer, $printJob->getPrinter());
+            self::assertSame($order, $printJob->getOrder());
+            self::assertSame(PrintDocumentType::LABEL, $printJob->getDocumentType());
+            self::assertSame(PrintJobStatus::QUEUED, $printJob->getStatus());
+            self::assertSame(0, $printJob->getAttemptCount());
+            self::assertNull($printJob->getDocumentPath());
+        }
     }
 
     public function testHandlerRendersStoresLogicalPathAndSubmitsOnce(): void
@@ -254,6 +262,95 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->createStub(MessageBusInterface::class),
             $this->createStub(LoggerInterface::class),
         ))(new ProcessPrintJob($printJob->getId()));
+    }
+
+    public function testCreatorCreatesOneLabelForEveryPackageAcrossOrderItems(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $cookies = (new ProductType())->setName('Cookies');
+        $tray = (new Unit())->setName('Tray')->setPackageUnit(true);
+        $this->entityManager->persist($cookies);
+        $this->entityManager->persist($tray);
+        $this->entityManager->flush();
+        $order->addItem(
+            (new OrderItem())
+                ->setProductType($cookies)
+                ->setQuantity('1')
+                ->setUnit($tray)
+                ->setDescription('Chocolate Chip')
+                ->setSortOrder(20),
+        );
+        $this->entityManager->flush();
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->with(self::isInstanceOf(ProcessPrintJob::class))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
+        $creator = new LabelPrintJobCreator(
+            $this->entityManager,
+            $this->printJobRepository,
+            new LabelPrinterResolver($this->printerRepository),
+            self::getContainer()->get(OrderPackageCalculator::class),
+            $bus,
+        );
+
+        $printJobs = $creator->createAndDispatch($order);
+
+        self::assertCount(3, $printJobs);
+        self::assertSame($printer, $printJobs[0]->getPrinter());
+        self::assertSame([1, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $printJobs));
+        self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
+        self::assertSame(['1', '1', '1'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $printJobs));
+        self::assertSame($order->getItems()->toArray()[0], $printJobs[0]->getOrderItem());
+        self::assertSame($order->getItems()->toArray()[1], $printJobs[2]->getOrderItem());
+    }
+
+    public function testCreatorStoresRuleBasedPartialPackageQuantities(): void
+    {
+        $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $cookies = (new ProductType())->setName('Cookies');
+        $each = (new Unit())->setName('Each');
+        $this->entityManager->persist($cookies);
+        $this->entityManager->persist($each);
+        $this->entityManager->flush();
+        $rule = (new PackagingRule())
+            ->setProductType($cookies)
+            ->setUnit($each)
+            ->setQuantityPerPackage('24');
+        $this->entityManager->persist($rule);
+        $order->addItem(
+            (new OrderItem())
+                ->setProductType($cookies)
+                ->setQuantity('30')
+                ->setUnit($each)
+                ->setDescription('Chocolate Chip')
+                ->setSortOrder(20),
+        );
+        $this->entityManager->flush();
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(4))
+            ->method('dispatch')
+            ->with(self::isInstanceOf(ProcessPrintJob::class))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $creator = new LabelPrintJobCreator(
+            $this->entityManager,
+            $this->printJobRepository,
+            new LabelPrinterResolver($this->printerRepository),
+            self::getContainer()->get(OrderPackageCalculator::class),
+            $bus,
+        );
+
+        $printJobs = $creator->createAndDispatch($order);
+        $ruleJobs = array_slice($printJobs, -2);
+
+        self::assertSame(['24', '6'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $ruleJobs));
+        self::assertSame([1, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $ruleJobs));
+        self::assertSame([2, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $ruleJobs));
     }
 
     public function testHandlerMarksRenderingFailureAndRethrowsForMessengerRetry(): void
@@ -471,7 +568,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         $customer = (new Customer())->setName('Snapshot Customer')->setPhone($phone);
         $employee = (new Employee())->setName('Counter Employee');
         $productType = (new ProductType())->setName('Donuts');
-        $unit = (new Unit())->setName('Dozen');
+        $unit = (new Unit())->setName('Dozen')->setPackageUnit(true);
         $this->entityManager->persist($customer);
         $this->entityManager->persist($employee);
         $this->entityManager->persist($productType);

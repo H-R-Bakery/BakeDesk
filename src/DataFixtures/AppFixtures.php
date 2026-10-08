@@ -6,6 +6,7 @@ namespace App\DataFixtures;
 
 use App\Entity\Customer;
 use App\Entity\Employee;
+use App\Entity\PackagingRule;
 use App\Entity\Printer;
 use App\Entity\ProductType;
 use App\Entity\Unit;
@@ -19,34 +20,48 @@ final class AppFixtures extends Fixture
     {
         $phoneUtil = PhoneNumberUtil::getInstance();
 
+        $productTypes = [];
         foreach ([
             ['Donuts', 10],
             ['Brownies', 20],
             ['Cookies', 30],
             ['Shape Cookies', 40],
         ] as [$name, $sortOrder]) {
-            $manager->persist(
-                (new ProductType())
-                    ->setName($name)
-                    ->setActive(true)
-                    ->setSortOrder($sortOrder),
-            );
+            $productType = (new ProductType())
+                ->setName($name)
+                ->setActive(true)
+                ->setSortOrder($sortOrder);
+            $productTypes[$name] = $productType;
+            $manager->persist($productType);
+        }
+
+        $units = [];
+        foreach ([
+            ['Each', 'ea', 10, false],
+            ['Dozen', 'doz', 20, true],
+            ['Half Dozen', '1/2 doz', 30, false],
+            ['Tray', 'tray', 40, true],
+            ['Box', 'box', 50, true],
+        ] as [$name, $abbreviation, $sortOrder, $isPackageUnit]) {
+            $unit = (new Unit())
+                ->setName($name)
+                ->setAbbreviation($abbreviation)
+                ->setActive(true)
+                ->setPackageUnit($isPackageUnit)
+                ->setSortOrder($sortOrder);
+            $units[$name] = $unit;
+            $manager->persist($unit);
         }
 
         foreach ([
-            ['Each', 'ea', 10],
-            ['Dozen', 'doz', 20],
-            ['Half Dozen', '1/2 doz', 30],
-            ['Tray', 'tray', 40],
-            ['Box', 'box', 50],
-        ] as [$name, $abbreviation, $sortOrder]) {
-            $manager->persist(
-                (new Unit())
-                    ->setName($name)
-                    ->setAbbreviation($abbreviation)
-                    ->setActive(true)
-                    ->setSortOrder($sortOrder),
-            );
+            [$productTypes['Donuts'], $units['Each'], '12'],
+            [$productTypes['Cookies'], $units['Each'], '24'],
+        ] as [$productType, $units, $quantityPerPackage]) {
+            $manager->persist((new PackagingRule())
+                ->setProductType($productType)
+                ->setUnit($units)
+                ->setQuantityPerPackage($quantityPerPackage)
+                ->setActive(true));
         }
 
         foreach ([
@@ -65,7 +80,7 @@ final class AppFixtures extends Fixture
             ['Cory Baker', true],
             ['Adrienne Baker', true],
             ['John Smith', true],
-        ] as [$name, $active, $phone]) {
+        ] as [$name, $active]) {
             $manager->persist((new Employee())
                 ->setName($name)
                 ->setActive($active)

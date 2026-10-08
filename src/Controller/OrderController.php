@@ -12,6 +12,9 @@ use App\Application\Order\OrderCanceller;
 use App\Application\Order\OrderFormDataFactory;
 use App\Application\Order\OrderSearchCriteria;
 use App\Application\Order\OrderUpdater;
+use App\Application\Packaging\OrderPackageCalculator;
+use App\Application\Packaging\PackageAllocation;
+use App\Application\Packaging\PackagingException;
 use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrintJobCreator;
 use App\Entity\Order;
@@ -62,6 +65,17 @@ final class OrderController extends AbstractController
                 $this->addFlash('warning', sprintf(
                     'Order #%s saved, but no default label printer is configured.',
                     $order->getOrderNumber(),
+                ));
+            } catch (PackagingException $exception) {
+                $logger->warning('Order labels could not be queued because package allocation failed.', [
+                    'order_id' => $order->getId(),
+                    'order_number' => $order->getOrderNumber(),
+                    'exception' => $exception,
+                ]);
+                $this->addFlash('warning', sprintf(
+                    'Order #%s saved, but labels could not be queued: %s',
+                    $order->getOrderNumber(),
+                    $exception->getMessage(),
                 ));
             } catch (\Throwable $exception) {
                 $logger->error('Order label could not be queued.', [
@@ -128,22 +142,32 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/orders/{id<\d+>}', name: 'order_detail', methods: ['GET'])]
-    public function detail(int $id, OrderRepository $orderRepository, PrintJobRepository $printJobRepository, BakeryClock $bakeryClock): Response
+    public function detail(int $id, OrderRepository $orderRepository, PrintJobRepository $printJobRepository, OrderPackageCalculator $orderPackageCalculator, BakeryClock $bakeryClock): Response
     {
         $order = $orderRepository->findForDetail($id);
         if (!$order instanceof Order) {
             throw $this->createNotFoundException();
         }
 
+        $packagingError = null;
+        try {
+            $packageAllocations = $orderPackageCalculator->calculate($order);
+        } catch (PackagingException $exception) {
+            $packageAllocations = [];
+            $packagingError = $exception->getMessage();
+        }
+
         return $this->render('order/detail.html.twig', [
             'order' => $order,
             'label_print_job' => $printJobRepository->findLatestLabelForOrder($order),
+            'package_allocations' => $packageAllocations,
+            'packaging_error' => $packagingError,
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
     }
 
     #[Route('/orders/{id<\d+>}/label', name: 'order_label', methods: ['GET'])]
-    public function label(int $id, OrderRepository $orderRepository, OrderLabelRenderer $orderLabelRenderer): Response
+    public function label(int $id, OrderRepository $orderRepository, OrderPackageCalculator $orderPackageCalculator, OrderLabelRenderer $orderLabelRenderer): Response
     {
         $order = $orderRepository->findForDetail($id);
         if (!$order instanceof Order) {
@@ -151,8 +175,51 @@ final class OrderController extends AbstractController
         }
 
         try {
-            $document = $orderLabelRenderer->render($order);
+            $allocations = $orderPackageCalculator->calculate($order);
+            if ([] === $allocations) {
+                throw new \LogicException('The order has no package allocations.');
+            }
+            $document = $orderLabelRenderer->render($allocations[0]);
         } catch (OrderLabelRenderingException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'The label preview is temporarily unavailable.', $exception);
+        } catch (PackagingException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'The label preview is temporarily unavailable.', $exception);
+        }
+
+        $response = new Response($document->getContents());
+        $response->headers->set('Content-Type', $document->mimeType);
+        $response->headers->set('Content-Disposition', $response->headers->makeDisposition(
+            ResponseHeaderBag::DISPOSITION_INLINE,
+            $document->filename,
+        ));
+
+        return $response;
+    }
+
+    #[Route('/orders/{id<\d+>}/label/{itemId<\d+>}/{packageNumber<\d+>}', name: 'order_label_package', methods: ['GET'])]
+    public function packageLabel(int $id, int $itemId, int $packageNumber, OrderRepository $orderRepository, OrderPackageCalculator $orderPackageCalculator, OrderLabelRenderer $orderLabelRenderer): Response
+    {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $allocation = null;
+            foreach ($orderPackageCalculator->calculate($order) as $candidate) {
+                if ($candidate->orderItem->getId() === $itemId && $candidate->packageNumber === $packageNumber) {
+                    $allocation = $candidate;
+                    break;
+                }
+            }
+            if (!$allocation instanceof PackageAllocation) {
+                throw $this->createNotFoundException();
+            }
+
+            $document = $orderLabelRenderer->render($allocation);
+        } catch (OrderLabelRenderingException $exception) {
+            throw new ServiceUnavailableHttpException(null, 'The label preview is temporarily unavailable.', $exception);
+        } catch (PackagingException $exception) {
             throw new ServiceUnavailableHttpException(null, 'The label preview is temporarily unavailable.', $exception);
         }
 

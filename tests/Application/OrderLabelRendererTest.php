@@ -7,6 +7,7 @@ namespace App\Tests\Application;
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
+use App\Application\Packaging\PackageAllocation;
 use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
@@ -93,6 +94,21 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('color: #fff;', $renderedHtml);
     }
 
+    public function testPackageLabelContainsOnlyItsAllocatedItemAndBoxPosition(): void
+    {
+        $order = $this->createOrder();
+        $donuts = $order->getItems()->toArray()[1];
+        $allocation = new PackageAllocation($donuts, 1, 2, '1', $donuts->getUnit());
+        $renderedHtml = $this->renderLabel($allocation);
+
+        self::assertStringContainsString('1 Dozen', $renderedHtml);
+        self::assertStringContainsString('Glazed donuts', $renderedHtml);
+        self::assertStringContainsString('BOX 1 OF 2', $renderedHtml);
+        self::assertStringNotContainsString('Brownies', $renderedHtml);
+        self::assertStringContainsString('Snapshot Customer', $renderedHtml);
+        self::assertStringContainsString('Order #1234', $renderedHtml);
+    }
+
     public function testTooMuchItemContentFailsBeforePdfRendering(): void
     {
         self::bootKernel();
@@ -126,7 +142,7 @@ final class OrderLabelRendererTest extends KernelTestCase
         $renderer->render($order);
     }
 
-    private function renderLabel(Order $order): string
+    private function renderLabel(Order|PackageAllocation $subject): string
     {
         self::bootKernel();
 
@@ -150,7 +166,7 @@ final class OrderLabelRendererTest extends KernelTestCase
             new NullLogger(),
         );
 
-        $renderer->render($order);
+        $renderer->render($subject);
 
         return $renderedHtml;
     }

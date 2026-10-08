@@ -20,6 +20,9 @@ class Unit
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $abbreviation = null;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $packageUnit = false;
+
     #[ORM\Column(options: ['default' => 0])]
     private int $sortOrder = 0;
 
@@ -48,6 +51,18 @@ class Unit
     public function setAbbreviation(?string $abbreviation): static
     {
         $this->abbreviation = $abbreviation;
+
+        return $this;
+    }
+
+    public function isPackageUnit(): bool
+    {
+        return $this->packageUnit;
+    }
+
+    public function setPackageUnit(bool $packageUnit): static
+    {
+        $this->packageUnit = $packageUnit;
 
         return $this;
     }

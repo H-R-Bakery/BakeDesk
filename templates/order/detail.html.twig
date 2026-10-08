@@ -11,7 +11,6 @@
             <h1 class="h2 mb-0">Order {{ order.orderNumber }}</h1>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-secondary" href="{{ path('order_label', {id: order.id}) }}" target="_blank" rel="noopener">Preview label (4×6 PDF)</a>
             {% if order.status.value == 'open' %}
                 <a class="btn btn-outline-primary" href="{{ path('order_edit', {id: order.id}) }}">Edit order</a>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-order-modal">
@@ -51,6 +50,32 @@
                     <dd class="col-sm-9">{{ order.notes }}</dd>
                 {% endif %}
             </dl>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h2 class="h5">Preview labels</h2>
+            {% if packaging_error %}
+                <p class="alert alert-warning mb-0">{{ packaging_error }}</p>
+            {% elseif package_allocations is empty %}
+                <p class="text-body-secondary mb-0">No package labels are available.</p>
+            {% else %}
+                <div class="list-group">
+                    {% for allocation in package_allocations %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
+                            <span>
+                                <strong>{{ allocation.orderItem.productType.name }}</strong>
+                                — {{ allocation.quantity }} {{ allocation.unit.name }}
+                                {% if allocation.packageCount > 1 %}
+                                    — Box {{ allocation.packageNumber }} of {{ allocation.packageCount }}
+                                {% endif %}
+                            </span>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('order_label_package', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}" target="_blank" rel="noopener">Preview</a>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
         </div>
     </div>
 

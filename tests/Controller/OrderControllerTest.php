@@ -10,6 +10,7 @@ use App\Entity\Customer;
 use App\Entity\Employee;
 use App\Entity\Order;
 use App\Entity\OrderItem;
+use App\Entity\PackagingRule;
 use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
@@ -44,7 +45,7 @@ final class OrderControllerTest extends WebTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, Printer::class, PrintJob::class],
+            [Customer::class, Employee::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
 
@@ -199,6 +200,50 @@ final class OrderControllerTest extends WebTestCase
             ['printJobId' => $printJob->getId()],
             get_object_vars($transport->getSent()[0]->getMessage()),
         );
+    }
+
+    public function testMissingPackagingRuleLeavesOrderSavedWithoutPartialLabelJobs(): void
+    {
+        [$employee] = $this->createEmployees();
+        [$productType] = $this->createProductTypes();
+        $dozen = (new Unit())->setName('Dozen')->setPackageUnit(true)->setActive(true);
+        $each = (new Unit())->setName('Each')->setPackageUnit(false)->setActive(true);
+        $this->entityManager->persist($dozen);
+        $this->entityManager->persist($each);
+        $this->entityManager->persist((new Printer())
+            ->setName('Configured label printer')
+            ->setAddress('ipp://printer.example/labels')
+            ->setForLabels(true)
+            ->setDefaultForLabels(true));
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/order/new');
+        $form = $crawler->selectButton('Save order')->form([
+            'new_order[customerName]' => 'Packaging Failure Customer',
+            'new_order[customerPhone]' => '8125551234',
+            'new_order[employee]' => (string) $employee->getId(),
+            'new_order[pickupDate]' => '2026-10-10',
+            'new_order[pickupTime]' => '09:30',
+            'new_order[items][0][productType]' => (string) $productType->getId(),
+            'new_order[items][0][quantity]' => '1',
+            'new_order[items][0][unit]' => (string) $dozen->getId(),
+            'new_order[items][0][description]' => 'Glazed',
+        ]);
+        $values = $form->getPhpValues();
+        $values['new_order']['items'][1] = [
+            'productType' => (string) $productType->getId(),
+            'quantity' => '30',
+            'unit' => (string) $each->getId(),
+            'description' => 'Chocolate',
+        ];
+
+        $this->client->request('POST', '/order/new', $values);
+        self::assertResponseRedirects('/order/1/created');
+        $this->client->followRedirect();
+
+        self::assertSelectorTextContains('.alert-warning', 'No active packaging rule exists for Donuts / Each');
+        self::assertSame(1, $this->entityManager->getRepository(Order::class)->count([]));
+        self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
     }
 
     public function testExistingCustomerIsReusedAndNewCustomerIsCreatedWhenNeeded(): void
@@ -506,7 +551,7 @@ final class OrderControllerTest extends WebTestCase
     /** @return array{Unit, Unit} */
     private function createUnits(): array
     {
-        $active = (new Unit())->setName('Each')->setSortOrder(10)->setActive(true);
+        $active = (new Unit())->setName('Each')->setPackageUnit(true)->setSortOrder(10)->setActive(true);
         $inactive = (new Unit())->setName('Inactive Unit')->setSortOrder(20)->setActive(false);
         $this->entityManager->persist($active);
         $this->entityManager->persist($inactive);

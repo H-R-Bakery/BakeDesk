@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\DataFixtures;
 
 use App\DataFixtures\AppFixtures;
+use App\Entity\PackagingRule;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use Doctrine\Persistence\ObjectManager;
@@ -17,7 +18,7 @@ final class AppFixturesTest extends TestCase
         $persisted = [];
         $manager = $this->createMock(ObjectManager::class);
         $manager
-            ->expects(self::exactly(14))
+            ->expects(self::exactly(18))
             ->method('persist')
             ->willReturnCallback(static function (object $entity) use (&$persisted): void {
                 $persisted[] = $entity;
@@ -54,11 +55,11 @@ final class AppFixturesTest extends TestCase
 
         self::assertSame(
             [
-                ['Each', 'ea', 10, true],
-                ['Dozen', 'doz', 20, true],
-                ['Half Dozen', '1/2 doz', 30, true],
-                ['Tray', 'tray', 40, true],
-                ['Box', 'box', 50, true],
+                ['Each', 'ea', 10, true, false],
+                ['Dozen', 'doz', 20, true, true],
+                ['Half Dozen', '1/2 doz', 30, true, false],
+                ['Tray', 'tray', 40, true, true],
+                ['Box', 'box', 50, true, true],
             ],
             array_map(
                 static fn (Unit $unit): array => [
@@ -66,9 +67,19 @@ final class AppFixturesTest extends TestCase
                     $unit->getAbbreviation(),
                     $unit->getSortOrder(),
                     $unit->isActive(),
+                    $unit->isPackageUnit(),
                 ],
                 $units,
             ),
         );
+
+        $rules = array_values(array_filter(
+            $persisted,
+            static fn (object $entity): bool => $entity instanceof PackagingRule,
+        ));
+        self::assertCount(1, $rules);
+        self::assertSame('24', $rules[0]->getQuantityPerPackage());
+        self::assertSame('Cookies', $rules[0]->getProductType()?->getName());
+        self::assertSame('Each', $rules[0]->getUnit()?->getName());
     }
 }

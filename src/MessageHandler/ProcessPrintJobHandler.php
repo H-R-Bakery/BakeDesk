@@ -6,6 +6,7 @@ namespace App\MessageHandler;
 
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
+use App\Application\Packaging\PackageAllocation;
 use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\PrinterClientInterface;
 use App\Application\Printing\PrinterSubmissionException;
@@ -74,7 +75,7 @@ final class ProcessPrintJobHandler
             $submission = $this->printerClient->submitPdf(
                 $printer,
                 (string) $printJob->getDocumentPath(),
-                sprintf('BakeDesk Order #%s', $order->getOrderNumber()),
+                $this->jobName($printJob, $order),
             );
         } catch (PrinterSubmissionException $exception) {
             $this->markFailed($printJob, $exception->getMessage());
@@ -153,7 +154,7 @@ final class ProcessPrintJobHandler
         });
 
         try {
-            $document = $this->orderLabelRenderer->render($order);
+            $document = $this->orderLabelRenderer->render($this->labelSubject($printJob, $order));
         } catch (\Throwable $exception) {
             $this->markFailed($printJob, sprintf('Unable to render the label for order %s.', $order->getOrderNumber()));
             $this->logger->error('Print job label rendering failed.', [
@@ -171,6 +172,35 @@ final class ProcessPrintJobHandler
                 ->setStatus(PrintJobStatus::RENDERED)
                 ->setErrorMessage(null);
         });
+    }
+
+    private function labelSubject(PrintJob $printJob, \App\Entity\Order $order): \App\Entity\Order|PackageAllocation
+    {
+        $orderItem = $printJob->getOrderItem();
+        if (null === $orderItem && null === $printJob->getPackageNumber() && null === $printJob->getPackageCount() && null === $printJob->getPackageQuantity()) {
+            return $order;
+        }
+
+        if (null === $orderItem || null === $printJob->getPackageNumber() || null === $printJob->getPackageCount() || null === $printJob->getPackageQuantity() || null === $orderItem->getUnit()) {
+            throw new \LogicException('A package label print job requires complete package metadata.');
+        }
+
+        return new PackageAllocation(
+            orderItem: $orderItem,
+            packageNumber: $printJob->getPackageNumber(),
+            packageCount: $printJob->getPackageCount(),
+            quantity: $printJob->getPackageQuantity(),
+            unit: $orderItem->getUnit(),
+        );
+    }
+
+    private function jobName(PrintJob $printJob, \App\Entity\Order $order): string
+    {
+        if (null !== $printJob->getPackageNumber() && null !== $printJob->getPackageCount()) {
+            return sprintf('BakeDesk Order #%s Box %d of %d', $order->getOrderNumber(), $printJob->getPackageNumber(), $printJob->getPackageCount());
+        }
+
+        return sprintf('BakeDesk Order #%s', $order->getOrderNumber());
     }
 
     private function markFailed(PrintJob $printJob, string $message): void

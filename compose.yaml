@@ -19,7 +19,7 @@ services:
     ports:
       - "5432:5432"
   ###< doctrine/doctrine-bundle ###
-  redis:
+  valkey:
     image: valkey/valkey:8.1-alpine
     restart: unless-stopped
     ports:

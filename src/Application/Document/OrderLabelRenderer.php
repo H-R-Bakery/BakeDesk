@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Document;
 
 use App\Application\Order\BakeryClock;
+use App\Application\Packaging\PackageAllocation;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use League\Flysystem\FilesystemOperator;
@@ -27,14 +28,21 @@ final class OrderLabelRenderer
     ) {
     }
 
-    public function render(Order $order): RenderedDocument
+    public function render(Order|PackageAllocation $subject): RenderedDocument
     {
+        $order = $subject instanceof PackageAllocation ? $subject->orderItem->getOrder() : $subject;
+        if (null === $order) {
+            throw new \LogicException('A package label requires an order.');
+        }
+
         try {
-            $items = $this->sortedItems($order);
-            $this->assertItemsFit($items);
+            $package = $subject instanceof PackageAllocation ? $subject : null;
+            $items = null === $package ? $this->sortedItems($order) : [$package->orderItem];
+            $this->assertItemsFit($items, $package);
             $html = $this->twig->render('order/label.html.twig', [
                 'order' => $order,
                 'items' => $items,
+                'package' => $package,
                 'pickup_at' => $this->asBakeryLocalDateTime($order->getPickupAt()),
                 'ordered_at' => $this->asBakeryLocalDateTime($order->getOrderedAt()),
                 'bakery_timezone' => $this->bakeryClock->getTimezoneName(),
@@ -45,7 +53,16 @@ final class OrderLabelRenderer
                 throw new \UnexpectedValueException('Gotenberg returned an invalid PDF document.');
             }
 
-            $filename = sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), $this->safePhoneNumber($order));
+            $filename = null === $package
+                ? sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), $this->safePhoneNumber($order))
+                : sprintf(
+                    'order-%s-%s-item-%s-box-%d-of-%d.pdf',
+                    $this->safeOrderNumber($order),
+                    $this->safePhoneNumber($order),
+                    $this->safeItemKey($package->orderItem),
+                    $package->packageNumber,
+                    $package->packageCount,
+                );
             $path = sprintf(
                 'labels/%s/%s/%s',
                 $order->getPickupAt()?->format('Y') ?? $this->bakeryClock->now()->format('Y'),
@@ -81,13 +98,18 @@ final class OrderLabelRenderer
      *
      * @param list<OrderItem> $items
      */
-    private function assertItemsFit(array $items): void
+    private function assertItemsFit(array $items, ?PackageAllocation $package = null): void
     {
         $lineCount = 0;
         foreach ($items as $item) {
-            $heading = sprintf('%s %s %s', $item->getQuantity(), $item->getUnit()?->getName() ?? '', $item->getProductType()?->getName() ?? '');
+            $quantity = null !== $package ? $package->quantity : $item->getQuantity();
+            $unit = null !== $package ? $package->unit : $item->getUnit();
+            $heading = sprintf('%s %s %s', $quantity, $unit?->getName() ?? '', $item->getProductType()?->getName() ?? '');
             $lineCount += max(1, (int) ceil(mb_strlen($heading) / 42));
             $lineCount += max(1, (int) ceil(mb_strlen($item->getDescription()) / 30));
+        }
+        if (null !== $package && $package->packageCount > 1) {
+            ++$lineCount;
         }
 
         if ($lineCount > 14) {
@@ -117,6 +139,11 @@ final class OrderLabelRenderer
         $safePhoneNumber = preg_replace('/[^0-9]+/', '', $order->getCustomerPhone()->getNationalNumber()) ?? $order->getId();
 
         return trim($safePhoneNumber);
+    }
+
+    private function safeItemKey(OrderItem $item): string
+    {
+        return (string) ($item->getId() ?? $item->getSortOrder());
     }
 
     private function asBakeryLocalDateTime(?\DateTimeImmutable $dateTime): ?\DateTimeImmutable

@@ -49,6 +49,7 @@ The initial domain consists of:
 - `OrderItem`
 - `ProductType`
 - `Unit`
+- `PackagingRule`
 - `Printer`
 - `PrintJob`
 
@@ -258,6 +259,18 @@ For example:
 
 remain separate quantities unless a future requirement explicitly adds normalization.
 
+### Physical package labels
+
+Labels represent physical packages or boxes, not entire Orders. A Unit marked
+`isPackageUnit` represents one physical package per whole unit; this behavior
+must come from the database flag rather than hard-coded unit names.
+
+Non-package Units require an active `PackagingRule` for the ProductType and
+Unit before labels can be queued. Missing rules must be reported and must never
+be guessed. Package arithmetic must be decimal-safe and must not use PHP binary
+floating point. A fractional quantity for a package Unit is a focused
+packaging error; use a separate configurable Unit such as `Half Dozen` instead.
+
 ---
 
 ## Production reports
@@ -286,6 +299,11 @@ into one product.
 The production report tells bakers broadly how much of each product type must be produced.
 
 The printed order label tells packing staff how the individual customer's order must be assembled.
+
+Each physical package receives its own label and its own LABEL `PrintJob`.
+Package allocations are calculated fulfillment data and are not persisted as
+entities. A package `PrintJob` stores nullable package metadata so historical
+whole-order print jobs remain readable.
 
 Reports must be available for download.
 
@@ -347,7 +365,7 @@ Generated documents are private application artifacts stored through `league/fly
 
 All application-initiated printing is asynchronous.
 
-Saving an order and printing its label are separate operations.
+Saving an order and printing its labels are separate operations.
 
 An order save must succeed even if printing fails.
 
@@ -355,16 +373,21 @@ Expected flow:
 
 1. Validate the order.
 2. Persist the order and order items.
-3. Persist a `PrintJob` in the database.
-4. Commit the database transaction.
-5. Dispatch a Messenger message containing the print-job identifier.
-6. Return control to the browser.
-7. A Messenger worker processes the print job.
-8. The worker renders the document.
-9. The worker submits it to the configured IPP printer.
-10. The worker records the accepted external IPP job identifier and asynchronously refreshes its status.
-11. Print status changes are persisted to PostgreSQL.
-12. Relevant status changes may be published through Mercure.
+3. Calculate every physical package before creating label jobs.
+4. If all allocations succeed, persist one LABEL `PrintJob` per package.
+5. Commit the database transaction.
+6. Dispatch one Messenger message per print-job identifier.
+7. Return control to the browser.
+8. A Messenger worker processes each print job independently.
+9. The worker renders the package document.
+10. The worker submits it to the configured IPP printer.
+11. The worker records the accepted external IPP job identifier and asynchronously refreshes its status.
+12. Print status changes are persisted to PostgreSQL.
+13. Relevant status changes may be published through Mercure.
+
+If a package allocation fails, the Order remains saved, no initial label jobs
+are created for that Order, and the queueing error identifies the ProductType
+and Unit when applicable.
 
 Never put Doctrine entities directly into Messenger messages.
 
@@ -386,6 +409,7 @@ Likely information includes:
 - document type
 - status
 - associated order when applicable
+- associated order item and package number/count/quantity for new package labels
 - report parameters when applicable
 - external IPP job identifier when available
 - attempt count
