@@ -25,12 +25,20 @@
                     <img class="navbar-brand-logo" src="{{ asset(bakery_logo_asset) }}" alt="{{ bakery_brand_name }} logo">
                     <span>{{ bakedesk_brand_name }}</span>
                 </a>
-                <div class="navbar-nav flex-row gap-3">
-                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_new' ? ' active' : '' }}" href="{{ path('order_new') }}">New Order</a>
-                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_' and app.request.attributes.get('_route') != 'order_new' ? ' active' : '' }}" href="{{ path('order_index') }}">Orders</a>
-                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'production_report' ? ' active' : '' }}" href="{{ path('production_report') }}">Production Report</a>
-                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'admin' ? ' active' : '' }}" href="{{ path('admin') }}">Admin</a>
-                </div>
+                {% set current_route = app.request.attributes.get('_route')|default('') %}
+                {% set more_active = current_route starts with 'customer' or current_route starts with 'production_report' or current_route starts with 'admin' %}
+                <ul class="navbar-nav flex-row gap-3 align-items-center">
+                    <li class="nav-item"><a class="nav-link{{ current_route starts with 'order_new' ? ' active' : '' }}" href="{{ path('order_new') }}"{% if current_route starts with 'order_new' %} aria-current="page"{% endif %}>New Order</a></li>
+                    <li class="nav-item"><a class="nav-link{{ current_route starts with 'order_' and current_route != 'order_new' ? ' active' : '' }}" href="{{ path('order_index') }}"{% if current_route starts with 'order_' and current_route != 'order_new' %} aria-current="page"{% endif %}>Orders</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle{{ more_active ? ' active' : '' }}" href="#" id="more-navigation" role="button" data-bs-toggle="dropdown" aria-expanded="false"{% if more_active %} aria-current="page"{% endif %}>More</a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="more-navigation">
+                            <li><a class="dropdown-item{{ current_route starts with 'customer' ? ' active' : '' }}" href="{{ path('customer_index') }}"{% if current_route starts with 'customer' %} aria-current="page"{% endif %}>Customers</a></li>
+                            <li><a class="dropdown-item{{ current_route starts with 'production_report' ? ' active' : '' }}" href="{{ path('production_report') }}"{% if current_route starts with 'production_report' %} aria-current="page"{% endif %}>Production Report</a></li>
+                            <li><a class="dropdown-item{{ current_route starts with 'admin' ? ' active' : '' }}" href="{{ path('admin') }}"{% if current_route starts with 'admin' %} aria-current="page"{% endif %}>Admin</a></li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </nav>
         <main class="container py-4">

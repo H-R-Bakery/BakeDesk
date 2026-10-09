@@ -154,6 +154,12 @@ must not be silently selected for new Orders. Customer history does not duplicat
 Order creation logic; New Order prefill continues through the normal
 CustomerResolver and order creation behavior.
 
+BakeDesk also provides an unauthenticated operational Customer directory at
+`/customers`. The directory is read-only and includes both active and inactive
+Customers for finding history or prefilling a New Order. Customer autocomplete
+remains active-only. The operational directory does not add customer editing,
+creation, or merge functionality.
+
 ---
 
 ## Order takers
@@ -624,6 +630,11 @@ Use Stimulus for targeted browser behavior such as:
 Use Turbo where it provides a clear benefit.
 
 Do not introduce React, Vue, Angular, or a separate SPA/API frontend unless explicitly requested.
+
+The main operational navbar keeps New Order and Orders as top-level links. A
+More dropdown contains Customers, Production Report, and Admin in that order.
+Admin is always visible in the operational navbar; server-side security
+controls access to the administration area.
 
 Controllers must remain thin and delegate business logic to services.
 

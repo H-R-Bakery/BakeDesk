@@ -71,6 +71,25 @@ final class AdminControllerTest extends WebTestCase
         self::assertStringContainsString('HRBakeryLogo', (string) $this->client->getResponse()->getContent());
     }
 
+    public function testOperationalNavbarKeepsAdminInMoreDropdown(): void
+    {
+        $this->client->request('GET', '/order/new');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('nav .navbar-nav > .nav-item > a[href="/order/new"]', 'New Order');
+        self::assertSelectorTextContains('nav .navbar-nav > .nav-item > a[href="/orders"]', 'Orders');
+        self::assertSelectorTextContains('nav .navbar-nav > .dropdown > a', 'More');
+        self::assertSelectorTextContains('nav .dropdown-menu', 'Customers');
+        self::assertSelectorTextContains('nav .dropdown-menu', 'Production Report');
+        self::assertSelectorTextContains('nav .dropdown-menu', 'Admin');
+        self::assertSelectorExists('nav .dropdown-toggle[data-bs-toggle="dropdown"][aria-expanded="false"]');
+        self::assertCount(2, $this->client->getCrawler()->filter('nav .navbar-nav > .nav-item:not(.dropdown) > a'));
+
+        $this->client->request('GET', '/customers');
+        self::assertSelectorExists('nav .dropdown-toggle.active');
+        self::assertSelectorExists('nav .dropdown-item.active[href="/customers"]');
+    }
+
     public function testAnonymousCannotAccessOrderAdmin(): void
     {
         $this->client->request('GET', '/admin/order');

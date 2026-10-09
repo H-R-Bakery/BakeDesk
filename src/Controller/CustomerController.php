@@ -18,6 +18,28 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class CustomerController extends AbstractController
 {
+    #[Route('/customers', name: 'customer_index', methods: ['GET'])]
+    public function index(Request $request, CustomerRepository $customerRepository): Response
+    {
+        $query = trim((string) $request->query->get('q', ''));
+        $page = max(1, (int) $request->query->get('page', 1));
+        $pageSize = 25;
+        $total = $customerRepository->countForDirectory($query);
+
+        if ($total > 0 && ($page - 1) * $pageSize >= $total) {
+            $page = (int) ceil($total / $pageSize);
+        }
+
+        return $this->render('customer/index.html.twig', [
+            'customers' => $customerRepository->searchForDirectory($query, $page, $pageSize),
+            'total' => $total,
+            'page' => $page,
+            'page_size' => $pageSize,
+            'total_pages' => max(1, (int) ceil($total / $pageSize)),
+            'query' => $query,
+        ]);
+    }
+
     #[Route('/customer/autocomplete', name: 'customer_autocomplete', methods: ['GET'])]
     public function autocomplete(Request $request, CustomerRepository $customerRepository): JsonResponse
     {

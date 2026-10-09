@@ -6,7 +6,12 @@
     {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}
     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
         <div>
-            <p class="text-body-secondary mb-1"><a href="{{ path('order_index') }}">Orders</a></p>
+            <nav aria-label="Breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ path('customer_index') }}">Customers</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ customer.name }}</li>
+                </ol>
+            </nav>
             <h1 class="h2 mb-2">{{ customer.name }}</h1>
             <p class="mb-2">{{ customer.phone|phone_number_format('NATIONAL') }}</p>
             <span class="badge text-bg-{{ customer.active ? 'success' : 'secondary' }}">{{ customer.active ? 'Active' : 'Inactive' }}</span>

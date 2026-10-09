@@ -98,11 +98,87 @@ final class CustomerControllerTest extends WebTestCase
         self::assertSelectorExists('a[href="/orders/'.$open->getId().'"]');
         self::assertSelectorExists('a[href="/orders/'.$completed->getId().'"]');
         self::assertSelectorExists('a[href="/orders/'.$cancelled->getId().'"]');
+        self::assertSelectorExists('a[href="/customers"]');
 
         $rows = $this->client->getCrawler()->filter('tbody tr');
         self::assertStringContainsString('1003', $rows->eq(0)->text());
         self::assertStringContainsString('1002', $rows->eq(1)->text());
         self::assertStringContainsString('1001', $rows->eq(2)->text());
+    }
+
+    public function testCustomerDirectoryListsActiveAndInactiveCustomersWithHistoryLinks(): void
+    {
+        $active = $this->createCustomer('Jane Directory', '+18125550131');
+        $inactive = $this->createCustomer('John Directory', '+18125550132', false);
+
+        $this->client->request('GET', '/customers');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('h1', 'Customers');
+        self::assertSelectorTextContains('body', 'Find a customer and view their order history.');
+        self::assertSelectorTextContains('#customers-table', 'Jane Directory');
+        self::assertSelectorTextContains('#customers-table', 'John Directory');
+        self::assertSelectorTextContains('#customers-table', '(812) 555-0131');
+        self::assertSelectorTextContains('#customers-table', '(812) 555-0132');
+        self::assertSelectorTextContains('#customers-table', 'Active');
+        self::assertSelectorTextContains('#customers-table', 'Inactive');
+        self::assertSelectorExists('a[href="/customers/'.$active->getId().'"]');
+        self::assertSelectorExists('a[href="/customers/'.$inactive->getId().'"]');
+        self::assertSelectorExists('a[href="/order/new?customer='.$active->getId().'"]');
+        self::assertSelectorNotExists('a[href="/order/new?customer='.$inactive->getId().'"]');
+    }
+
+    public function testCustomerDirectorySearchesAllCustomersByNameAndPhone(): void
+    {
+        $nameMatch = $this->createCustomer('Directory Search Match', '+18125550133', false);
+        $phoneMatch = $this->createCustomer('Another Directory Customer', '+18125550134');
+        $this->createCustomer('Unrelated Directory Customer', '+18125550135');
+
+        $this->client->request('GET', '/customers?q=search%20match');
+        self::assertSelectorTextContains('#customers-table', 'Directory Search Match');
+        self::assertStringNotContainsString('Another Directory Customer', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Unrelated Directory Customer', (string) $this->client->getResponse()->getContent());
+        self::assertSelectorExists('a[href="/customers/'.$nameMatch->getId().'"]');
+
+        $this->client->request('GET', '/customers?q=812-555-0134');
+        self::assertSelectorTextContains('#customers-table', 'Another Directory Customer');
+        self::assertStringNotContainsString('Directory Search Match', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Unrelated Directory Customer', (string) $this->client->getResponse()->getContent());
+        self::assertSelectorExists('a[href="/order/new?customer='.$phoneMatch->getId().'"]');
+    }
+
+    public function testCustomerDirectoryPaginatesDeterministicallyAndRetainsSearch(): void
+    {
+        for ($number = 26; $number >= 1; --$number) {
+            $this->createCustomer(sprintf('Paging Directory %02d', $number), sprintf('+18125550%03d', $number));
+        }
+
+        $this->client->request('GET', '/customers?q=Paging%20Directory&page=2');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $this->client->getCrawler()->filter('#customers-table tbody tr'));
+        self::assertSelectorTextContains('#customers-table', 'Paging Directory 26');
+        $paginationLinks = $this->client->getCrawler()->filter('a.page-link')->each(static fn ($link): string => (string) $link->attr('href'));
+        self::assertTrue([] !== array_filter($paginationLinks, static fn (string $href): bool => str_contains($href, 'q=Paging') && str_contains($href, 'page=1')));
+
+        $this->client->request('GET', '/customers?q=Paging%20Directory&page=1');
+        self::assertCount(25, $this->client->getCrawler()->filter('#customers-table tbody tr'));
+        self::assertSelectorTextContains('#customers-table tbody tr:first-child', 'Paging Directory 01');
+        self::assertSelectorTextContains('#customers-table tbody tr:last-child', 'Paging Directory 25');
+        self::assertStringNotContainsString('Paging Directory 26', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testCustomerAutocompleteRemainsActiveOnly(): void
+    {
+        $active = $this->createCustomer('Autocomplete Match', '+18125550136');
+        $this->createCustomer('Autocomplete Match Inactive', '+18125550137', false);
+
+        $this->client->request('GET', '/customer/autocomplete?q=Autocomplete');
+
+        self::assertResponseIsSuccessful();
+        $results = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertCount(1, $results);
+        self::assertSame($active->getId(), $results[0]['id']);
     }
 
     public function testCustomerHistoryPaginatesInStablePickupOrder(): void
