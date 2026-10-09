@@ -536,6 +536,16 @@ A browser that reconnects must be able to retrieve current state from Symfony/Po
 
 Do not require Mercure for basic order creation or reporting to function.
 
+Mercure provides best-effort realtime UI updates. Database and application state
+remain authoritative, and Mercure publication failure must never fail an order
+operation or printing. Operational pages use small JSON Mercure events and
+Stimulus DOM updates. The Orders list subscribes to order-summary changes;
+Order detail and order-created pages subscribe to per-order changes, including
+label PrintJob status. Do not duplicate server-side filtering or business rules
+in JavaScript, and do not publish sensitive or unnecessary customer data. The
+operational UI uses `bakedesk:orders` for global order summaries and
+`bakedesk:order:{id}` for per-order order and label PrintJob events.
+
 ---
 
 ## Administration

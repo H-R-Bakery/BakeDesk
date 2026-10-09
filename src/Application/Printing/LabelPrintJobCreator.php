@@ -6,6 +6,7 @@ namespace App\Application\Printing;
 
 use App\Application\Packaging\OrderPackageCalculator;
 use App\Application\Packaging\PackageAllocation;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
 use App\Entity\Printer;
 use App\Entity\PrintJob;
@@ -24,6 +25,7 @@ final class LabelPrintJobCreator
         private readonly LabelPrinterResolver $labelPrinterResolver,
         private readonly OrderPackageCalculator $orderPackageCalculator,
         private readonly MessageBusInterface $messageBus,
+        private readonly ?OrderRealtimePublisher $realtimePublisher = null,
     ) {
     }
 
@@ -87,6 +89,7 @@ final class LabelPrintJobCreator
                 throw new \LogicException('The label print job was not assigned an identifier.');
             }
 
+            $this->realtimePublisher?->publishPrintJobUpdated($printJob);
             $this->messageBus->dispatch(new ProcessPrintJob($printJobId));
         }
 

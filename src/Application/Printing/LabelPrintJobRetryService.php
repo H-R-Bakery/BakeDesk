@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Printing;
 
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\PrintJob;
 use App\Message\ProcessPrintJob;
 use App\Model\OrderStatus;
@@ -19,6 +20,7 @@ final class LabelPrintJobRetryService
         private readonly EntityManagerInterface $entityManager,
         private readonly PrintJobRepository $printJobRepository,
         private readonly MessageBusInterface $messageBus,
+        private readonly ?OrderRealtimePublisher $realtimePublisher = null,
     ) {
     }
 
@@ -74,6 +76,7 @@ final class LabelPrintJobRetryService
             throw new \LogicException('The retry print job was not assigned an identifier.');
         }
 
+        $this->realtimePublisher?->publishPrintJobUpdated($retryJob);
         $this->messageBus->dispatch(new ProcessPrintJob($retryJobId));
 
         return $retryJob;

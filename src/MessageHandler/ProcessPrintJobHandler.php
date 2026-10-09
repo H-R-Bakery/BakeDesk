@@ -11,6 +11,7 @@ use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\PrinterClientInterface;
 use App\Application\Printing\PrinterSubmissionException;
 use App\Application\Printing\ProductionReportPrintDocumentGenerator;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\PrintJob;
 use App\Message\ProcessPrintJob;
 use App\Message\RefreshPrintJobStatus;
@@ -36,6 +37,7 @@ final class ProcessPrintJobHandler
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly ?ProductionReportPrintDocumentGenerator $reportDocumentGenerator = null,
+        private readonly ?OrderRealtimePublisher $realtimePublisher = null,
     ) {
     }
 
@@ -122,6 +124,7 @@ final class ProcessPrintJobHandler
                     ->setErrorMessage($submission->initialStatus?->diagnosticMessage() ?? 'The printer aborted the job.');
             }
         });
+        $this->publishStatus($printJob);
 
         if (null === $mappedInitialStatus || PrintJobStatus::SUBMITTED === $mappedInitialStatus) {
             $printJobId = $printJob->getId();
@@ -157,6 +160,7 @@ final class ProcessPrintJobHandler
                 ->setErrorMessage(null)
                 ->setDocumentPath(null);
         });
+        $this->publishStatus($printJob);
 
         try {
             $document = PrintDocumentType::REPORT === $documentType
@@ -182,6 +186,7 @@ final class ProcessPrintJobHandler
                 ->setStatus(PrintJobStatus::RENDERED)
                 ->setErrorMessage(null);
         });
+        $this->publishStatus($printJob);
     }
 
     private function labelSubject(PrintJob $printJob): \App\Entity\Order|PackageAllocation
@@ -248,5 +253,11 @@ final class ProcessPrintJobHandler
                 ->setStatus(PrintJobStatus::FAILED)
                 ->setErrorMessage($message);
         });
+        $this->publishStatus($printJob);
+    }
+
+    private function publishStatus(PrintJob $printJob): void
+    {
+        $this->realtimePublisher?->publishPrintJobUpdated($printJob);
     }
 }

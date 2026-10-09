@@ -200,6 +200,12 @@ final class OrderControllerTest extends WebTestCase
             ['printJobId' => $printJob->getId()],
             get_object_vars($transport->getSent()[0]->getMessage()),
         );
+
+        $this->client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-controller="mercure-status"][data-mercure-status-order-id-value="1"]');
+        self::assertSelectorTextContains('[data-role="package-print-status"]', 'Queued');
+        self::assertSelectorExists('[data-role="package-print-status"][data-order-item-id="1"][data-package-number="1"]');
     }
 
     public function testMissingPackagingRuleFallsBackToOneLabelAndKeepsPackageUnitLabels(): void

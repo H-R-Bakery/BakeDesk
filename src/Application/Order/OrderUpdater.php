@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Order;
 
 use App\Application\Customer\CustomerResolver;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Model\OrderStatus;
@@ -16,6 +17,7 @@ final class OrderUpdater
         private EntityManagerInterface $entityManager,
         private CustomerResolver $customerResolver,
         private BakeryClock $bakeryClock,
+        private OrderRealtimePublisher $realtimePublisher,
     ) {
     }
 
@@ -25,7 +27,9 @@ final class OrderUpdater
             throw new \LogicException('Only open orders can be edited.');
         }
 
-        return $this->entityManager->wrapInTransaction(function () use ($order, $input): Order {
+        $wasPaid = $order->isPaid();
+        $wasStatus = $order->getStatus();
+        $updatedOrder = $this->entityManager->wrapInTransaction(function () use ($order, $input): Order {
             $customer = $this->customerResolver->resolve($input->customerName, $input->customerPhone, $input->customer);
 
             $order
@@ -73,5 +77,11 @@ final class OrderUpdater
 
             return $order;
         });
+
+        if ($wasPaid !== $updatedOrder->isPaid() || $wasStatus !== $updatedOrder->getStatus()) {
+            $this->realtimePublisher->publishOrderUpdated($updatedOrder);
+        }
+
+        return $updatedOrder;
     }
 }

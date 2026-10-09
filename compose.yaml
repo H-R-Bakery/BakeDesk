@@ -34,7 +34,7 @@ services:
 
   ###> symfony/mercure-bundle ###
   mercure:
-    image: dunglas/mercure
+    image: dunglas/mercure:v0.19
     restart: unless-stopped
     environment:
       # Uncomment the following line to disable HTTPS,
@@ -43,7 +43,8 @@ services:
       MERCURE_SUBSCRIBER_JWT_KEY: "${MERCURE_JWT_SECRET}"
       # Set the URL of your Symfony project (without trailing slash!) as value of the cors_origins directive
       MERCURE_EXTRA_DIRECTIVES: |
-        cors_origins http://127.0.0.1:8000
+        cors_origins http://127.0.0.1:8000 http://localhost:8000 https://127.0.0.1 https://localhost
+        anonymous
     # Comment the following line to disable the development mode
     #    command: /usr/bin/caddy run --config /etc/caddy/dev.Caddyfile
     healthcheck:

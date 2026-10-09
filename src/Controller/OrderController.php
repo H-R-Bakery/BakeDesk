@@ -151,19 +151,9 @@ final class OrderController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $packagingError = null;
-        try {
-            $packageAllocations = $orderPackageCalculator->calculate($order);
-        } catch (PackagingException $exception) {
-            $packageAllocations = [];
-            $packagingError = $exception->getMessage();
-        }
-
         return $this->render('order/detail.html.twig', [
             'order' => $order,
-            'latest_label_jobs' => $this->latestLabelJobsByPackage($printJobRepository->findLabelJobsForOrder($order)),
-            'package_allocations' => $packageAllocations,
-            'packaging_error' => $packagingError,
+            ...$this->labelStatusContext($order, $printJobRepository, $orderPackageCalculator),
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
     }
@@ -406,7 +396,7 @@ final class OrderController extends AbstractController
     }
 
     #[Route('/order/{id<\d+>}/created', name: 'order_created', methods: ['GET'])]
-    public function created(int $id, OrderRepository $orderRepository, BakeryClock $bakeryClock): Response
+    public function created(int $id, OrderRepository $orderRepository, PrintJobRepository $printJobRepository, OrderPackageCalculator $orderPackageCalculator, BakeryClock $bakeryClock): Response
     {
         $order = $orderRepository->find($id);
         if (!$order instanceof Order) {
@@ -415,6 +405,7 @@ final class OrderController extends AbstractController
 
         return $this->render('order/created.html.twig', [
             'order' => $order,
+            ...$this->labelStatusContext($order, $printJobRepository, $orderPackageCalculator),
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
     }
@@ -447,27 +438,23 @@ final class OrderController extends AbstractController
     }
 
     /**
-     * @param list<\App\Entity\PrintJob> $printJobs
-     *
-     * @return array<string, \App\Entity\PrintJob>
+     * @return array{latest_label_jobs: array<string, \App\Entity\PrintJob>, package_allocations: list<PackageAllocation>, packaging_error: ?string}
      */
-    private function latestLabelJobsByPackage(array $printJobs): array
+    private function labelStatusContext(Order $order, PrintJobRepository $printJobRepository, OrderPackageCalculator $orderPackageCalculator): array
     {
-        $latest = [];
-        foreach ($printJobs as $printJob) {
-            $orderItemId = $printJob->getOrderItem()?->getId();
-            $packageNumber = $printJob->getPackageNumber();
-            if (null === $orderItemId || null === $packageNumber) {
-                continue;
-            }
-
-            $key = $orderItemId.':'.$packageNumber;
-            if (!\array_key_exists($key, $latest)) {
-                $latest[$key] = $printJob;
-            }
+        try {
+            $packageAllocations = $orderPackageCalculator->calculate($order);
+            $packagingError = null;
+        } catch (PackagingException $exception) {
+            $packageAllocations = [];
+            $packagingError = $exception->getMessage();
         }
 
-        return $latest;
+        return [
+            'latest_label_jobs' => $printJobRepository->findLatestLabelJobsByPackageForOrder($order),
+            'package_allocations' => $packageAllocations,
+            'packaging_error' => $packagingError,
+        ];
     }
 
     private function allocationLabel(PackageAllocation $allocation): string

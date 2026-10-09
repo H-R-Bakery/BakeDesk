@@ -7,6 +7,7 @@ namespace App\MessageHandler;
 use App\Application\Order\BakeryClock;
 use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\PrinterClientInterface;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\PrintJob;
 use App\Message\RefreshPrintJobStatus;
 use App\Model\PrintJobStatus;
@@ -21,7 +22,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 final class RefreshPrintJobStatusHandler
 {
     /** @var list<int> */
-    private const REFRESH_DELAYS_MS = [5000, 10000, 20000, 30000, 60000];
+    private const REFRESH_DELAYS_MS = [2000, 5000, 10000, 20000, 30000];
 
     public function __construct(
         private readonly PrintJobRepository $printJobRepository,
@@ -31,6 +32,7 @@ final class RefreshPrintJobStatusHandler
         private readonly BakeryClock $bakeryClock,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
+        private readonly ?OrderRealtimePublisher $realtimePublisher = null,
     ) {
     }
 
@@ -76,6 +78,7 @@ final class RefreshPrintJobStatusHandler
                 $printJob->setErrorMessage($snapshot->diagnosticMessage() ?? 'The printer aborted the job.');
             }
         });
+        $this->realtimePublisher?->publishPrintJobUpdated($printJob);
     }
 
     private function scheduleNextRefresh(PrintJob $printJob, int $checkNumber): void

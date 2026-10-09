@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Order;
 
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
 use App\Model\OrderStatus;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,6 +14,7 @@ final class OrderCanceller
     public function __construct(
         private EntityManagerInterface $entityManager,
         private BakeryClock $bakeryClock,
+        private OrderRealtimePublisher $realtimePublisher,
     ) {
     }
 
@@ -27,5 +29,7 @@ final class OrderCanceller
                 ->setStatus(OrderStatus::CANCELLED)
                 ->setUpdatedAt($this->bakeryClock->now());
         });
+
+        $this->realtimePublisher->publishOrderUpdated($order);
     }
 }

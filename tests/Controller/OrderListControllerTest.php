@@ -39,8 +39,8 @@ final class OrderListControllerTest extends WebTestCase
     {
         $today = $this->bakeryClock->today();
         $this->createOrder('1001', $today->modify('-1 day')->setTime(10, 0), 'Past Open');
-        $this->createOrder('1002', $today->modify('+1 day')->setTime(14, 0), 'Later Open');
-        $this->createOrder('1003', $today->modify('+1 day')->setTime(9, 0), 'Earlier Open');
+        $later = $this->createOrder('1002', $today->modify('+1 day')->setTime(14, 0), 'Later Open');
+        $earlier = $this->createOrder('1003', $today->modify('+1 day')->setTime(9, 0), 'Earlier Open');
         $this->createOrder('1004', $today->modify('+1 day')->setTime(8, 0), 'Completed', OrderStatus::COMPLETED);
         $this->createOrder('1005', $today->modify('+1 day')->setTime(7, 0), 'Cancelled', OrderStatus::CANCELLED);
 
@@ -53,6 +53,8 @@ final class OrderListControllerTest extends WebTestCase
         self::assertSame(2, $this->client->getCrawler()->filter('#orders-table tbody tr')->count());
         self::assertStringContainsString('1003', $this->client->getCrawler()->filter('#orders-table tbody tr')->eq(0)->text());
         self::assertStringContainsString('1002', $this->client->getCrawler()->filter('#orders-table tbody tr')->eq(1)->text());
+        self::assertSelectorExists(sprintf('[data-role="paid-status"][data-order-id="%d"]', $earlier->getId()));
+        self::assertSelectorExists(sprintf('[data-role="order-status"][data-order-id="%d"]', $later->getId()));
         self::assertStringNotContainsString('1001', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('1004', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('1005', (string) $this->client->getResponse()->getContent());
@@ -171,6 +173,8 @@ final class OrderListControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Alex Baker');
         self::assertSelectorTextContains('body', 'Paid');
         self::assertSelectorTextContains('body', 'Open');
+        self::assertSelectorExists(sprintf('[data-role="paid-status"][data-order-id="%d"]', $order->getId()));
+        self::assertSelectorExists(sprintf('[data-role="order-status"][data-order-id="%d"]', $order->getId()));
         self::assertSelectorTextContains('body', 'Call when ready');
         self::assertSelectorTextContains('body', 'Glazed');
         self::assertSelectorTextContains('body', 'Chocolate');

@@ -8,6 +8,7 @@
 
 {% block body %}
     {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}
+    <div data-controller="mercure-status" data-mercure-status-subscription-url-value="{{ mercure('bakedesk:orders') }}">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
         <div>
             <h1 class="h2 mb-1">Orders</h1>
@@ -80,15 +81,15 @@
                 <tbody>
                     {% for row in rows %}
                         {% set order = row.order %}
-                        <tr>
+                        <tr data-order-id="{{ order.id }}">
                             <td data-sort-value="{{ order.orderNumber }}"><a class="fw-semibold" href="{{ path('order_detail', {id: order.id}) }}">{{ order.orderNumber }}</a></td>
                             <td data-sort-value="{{ order.pickupAt|date('Y-m-d H:i:s', bakery_timezone) }}"><span class="d-block">{{ order.pickupAt|date('D, M j', bakery_timezone) }}</span><span class="text-body-secondary">{{ order.pickupAt|date('g:i A', bakery_timezone) }}</span></td>
                             <td>{{ order.customerName }}</td>
                             <td>{{ order.customerPhone|phone_number_format('NATIONAL') }}</td>
                             <td>{{ order.user.name }}</td>
                             <td>{{ row.itemCount }} item{{ row.itemCount == 1 ? '' : 's' }}</td>
-                            <td><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></td>
-                            <td><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></td>
+                            <td><span data-order-id="{{ order.id }}" data-role="paid-status" class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></td>
+                            <td><span data-order-id="{{ order.id }}" data-role="order-status" class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -108,4 +109,5 @@
         {% endif %}
         <p class="small text-body-secondary mt-2">Showing {{ (page - 1) * page_size + 1 }}–{{ min(page * page_size, total) }} of {{ total }} order{{ total == 1 ? '' : 's' }}.</p>
     {% endif %}
+    </div>
 {% endblock %}
