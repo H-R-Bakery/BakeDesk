@@ -36,10 +36,10 @@ final class PrinterCrudController extends ReferenceCrudController
         yield IdField::new('id')->hideOnForm();
         yield TextField::new('name', 'Name');
         yield TextField::new('address', 'IPP Address')->setHelp('Example: ipp://printer-host/ipp/print');
-        yield BooleanField::new('active', 'Active');
-        yield BooleanField::new('forLabels', 'Available for labels');
-        yield BooleanField::new('forReports', 'Available for reports');
-        yield BooleanField::new('defaultForLabels', 'Default label printer')->setHelp('A default label printer must be active and available for labels.');
+        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
+        yield BooleanField::new('forLabels', 'Available for labels')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
+        yield BooleanField::new('forReports', 'Available for reports')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
+        yield BooleanField::new('defaultForLabels', 'Default label printer')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true)->setHelp('A default label printer must be active and available for labels.');
         yield DateTimeField::new('createdAt')->hideOnForm();
         yield DateTimeField::new('updatedAt')->hideOnForm();
     }

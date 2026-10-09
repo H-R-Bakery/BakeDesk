@@ -92,7 +92,7 @@ final class OrderCrudController extends AbstractCrudController
         yield DateTimeField::new('orderedAt', 'Ordered')
             ->setTimezone($this->bakeryTimezone)
             ->setFormat(DateTimeField::FORMAT_MEDIUM, DateTimeField::FORMAT_SHORT);
-        yield BooleanField::new('paid', 'Paid');
+        yield BooleanField::new('paid', 'Paid')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
         yield ChoiceField::new('status', 'Status')
             ->setChoices([
                 'Open' => OrderStatus::OPEN,

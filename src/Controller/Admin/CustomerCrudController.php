@@ -35,7 +35,7 @@ final class CustomerCrudController extends ReferenceCrudController
             ->setFormTypeOption('default_region', 'US')
             ->setFormTypeOption('number_type', PhoneNumberType::NUMBER_TYPE_TEL)
             ->formatValue(static fn ($phone): string => null === $phone ? '' : \libphonenumber\PhoneNumberUtil::getInstance()->format($phone, \libphonenumber\PhoneNumberFormat::NATIONAL));
-        yield BooleanField::new('active', 'Active');
+        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
         yield DateTimeField::new('createdAt')->hideOnForm();
         yield DateTimeField::new('updatedAt')->hideOnForm();
     }

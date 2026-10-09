@@ -26,7 +26,7 @@ final class ProductTypeCrudController extends ReferenceCrudController
     public function configureFields(string $pageName): iterable
     {
         yield TextField::new('name', 'Name');
-        yield BooleanField::new('active', 'Active');
+        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
         yield IntegerField::new('sortOrder', 'Sort order')->setHelp('Lower values appear first in order entry and reports.');
     }
 }

@@ -33,6 +33,6 @@ final class PackagingRuleCrudController extends ReferenceCrudController
             ->setNumDecimals(2)
             ->setStoredAsString(true)
             ->setHelp('Optional. Defines how many of this Product Type and Unit fit in one physical package. If no active rule exists, the entire order item is treated as one package.');
-        yield BooleanField::new('active', 'Active');
+        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
     }
 }

@@ -29,9 +29,7 @@
                     <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_new' ? ' active' : '' }}" href="{{ path('order_new') }}">New Order</a>
                     <a class="nav-link{{ app.request.attributes.get('_route') starts with 'order_' and app.request.attributes.get('_route') != 'order_new' ? ' active' : '' }}" href="{{ path('order_index') }}">Orders</a>
                     <a class="nav-link{{ app.request.attributes.get('_route') starts with 'production_report' ? ' active' : '' }}" href="{{ path('production_report') }}">Production Report</a>
-                    {% if is_granted('ROLE_ADMIN') %}
-                        <a class="nav-link{{ app.request.attributes.get('_route') starts with 'admin' ? ' active' : '' }}" href="{{ path('admin') }}">Admin</a>
-                    {% endif %}
+                    <a class="nav-link{{ app.request.attributes.get('_route') starts with 'admin' ? ' active' : '' }}" href="{{ path('admin') }}">Admin</a>
                 </div>
             </div>
         </nav>
