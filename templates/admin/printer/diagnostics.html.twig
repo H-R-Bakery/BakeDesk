@@ -1,0 +1,78 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}Printer Diagnostics{% endblock %}
+
+{% block page_actions %}
+    <a class="btn btn-secondary" href="{{ path('admin_printer_index') }}">Back to Printers</a>
+    <a class="btn btn-primary" href="{{ path('admin_printer_detail', {entityId: printer.id}) }}">Printer Details</a>
+{% endblock %}
+
+{% block main %}
+    <div class="content-panel">
+        <h2 class="h4">{{ printer.name }}</h2>
+        <p class="text-body-secondary mb-4"><code>{{ printer_address }}</code></p>
+
+        {% if status_error %}
+            <div class="alert alert-danger" role="alert">{{ status_error }}</div>
+        {% endif %}
+
+        <h3 class="h5">BakeDesk configuration</h3>
+        <dl class="row">
+            <dt class="col-sm-4">Active</dt>
+            <dd class="col-sm-8">{{ printer.active ? 'Yes' : 'No' }}</dd>
+            <dt class="col-sm-4">Enabled for labels</dt>
+            <dd class="col-sm-8">{{ printer.forLabels ? 'Yes' : 'No' }}</dd>
+            <dt class="col-sm-4">Enabled for reports</dt>
+            <dd class="col-sm-8">{{ printer.forReports ? 'Yes' : 'No' }}</dd>
+            <dt class="col-sm-4">Default label printer</dt>
+            <dd class="col-sm-8">{{ printer.defaultForLabels ? 'Yes' : 'No' }}</dd>
+        </dl>
+
+        {% if status %}
+            <h3 class="h5 mt-4">IPP status</h3>
+            <dl class="row">
+                <dt class="col-sm-4">State</dt>
+                <dd class="col-sm-8"><span class="badge text-bg-{{ state_badge_class }}">{{ state_label }}</span></dd>
+                <dt class="col-sm-4">Accepting jobs</dt>
+                <dd class="col-sm-8">{{ accepts_jobs_label }}</dd>
+                <dt class="col-sm-4">Supports application/pdf</dt>
+                <dd class="col-sm-8">{{ pdf_support_label }}</dd>
+                <dt class="col-sm-4">Printer-state reasons</dt>
+                <dd class="col-sm-8">
+                    <ul class="mb-0">
+                        {% for reason in reasons %}
+                            <li>{{ reason }}</li>
+                        {% endfor %}
+                    </ul>
+                </dd>
+            </dl>
+
+            {% if raw_attributes is not empty %}
+                <details class="mt-4">
+                    <summary>Raw IPP attributes</summary>
+                    <dl class="row mt-3">
+                        {% for name, value in raw_attributes %}
+                            <dt class="col-sm-4"><code>{{ name }}</code></dt>
+                            <dd class="col-sm-8"><code>{{ value is iterable ? value|json_encode : value }}</code></dd>
+                        {% endfor %}
+                    </dl>
+                </details>
+            {% endif %}
+        {% endif %}
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            {% if printer.active and printer.forLabels %}
+                <form method="post" action="{{ path('admin_printer_test_label', {id: printer.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('printer-test-label-' ~ printer.id) }}">
+                    <button class="btn btn-outline-primary" type="submit">Test Label</button>
+                </form>
+            {% endif %}
+            {% if printer.active and printer.forReports %}
+                <form method="post" action="{{ path('admin_printer_test_report', {id: printer.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('printer-test-report-' ~ printer.id) }}">
+                    <button class="btn btn-outline-primary" type="submit">Test Report</button>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

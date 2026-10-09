@@ -415,6 +415,10 @@ Printing infrastructure must be isolated behind an application service abstracti
 
 Order controllers, report controllers, and Messenger handlers must not contain raw CUPS/IPP commands.
 
+Administrator printer diagnostics use `PrinterClientInterface::getPrinterStatus()` through a focused application service. The admin can explicitly check a configured printer; status failures are logged and displayed without automatically changing `Printer.active`.
+
+Administrator test prints use the same generic IPP abstraction and require an active Printer with the matching `forLabels` or `forReports` capability. Diagnostic test prints are separate from operational `PrintJob` history and do not create Orders or Production Reports.
+
 Printing-related responsibilities should be separated so that another IPP implementation can be substituted later.
 
 BakeDesk performs IPP printing through the selected PHP IPP client behind `PrinterClientInterface`. The configured printer address remains the complete direct or CUPS IPP URI.
@@ -429,6 +433,8 @@ Gotenberg 8 is the application PDF rendering service for HTML documents, using t
 
 Generated documents are private application artifacts stored through `league/flysystem-bundle`; application code must use the Flysystem abstraction rather than depending on local filesystem paths.
 `PrintJob` stores the generated document's logical Flysystem path, never an absolute filesystem path.
+
+Diagnostic label test documents are rendered as 4x6 PDFs. Diagnostic report test documents are rendered as Letter PDFs. Both use private diagnostic Flysystem paths and contain no customer or order data.
 
 ---
 
@@ -473,6 +479,12 @@ actions are asynchronous and use POST routes protected by scoped CSRF tokens.
 
 Changing payment status does not create PrintJobs, reprint labels, change
 package allocation, or regenerate reports.
+
+Diagnostic printer test submissions are intentional administrator POST actions
+with CSRF protection. They submit directly through
+`PrinterClientInterface::submitPdf()` and remain outside the asynchronous
+operational PrintJob pipeline. Successful IPP acceptance is described as
+submitted or accepted unless physical completion is confirmed.
 
 Never put Doctrine entities directly into Messenger messages.
 

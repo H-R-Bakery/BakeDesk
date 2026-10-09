@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: 4in 6in; margin: 0; }
+        * { box-sizing: border-box; }
+        html, body { width: 4in; height: 6in; margin: 0; padding: 0; }
+        body { color: #000; background: #fff; font-family: Arial, Helvetica, sans-serif; }
+        main { height: 6in; padding: 0.35in; display: flex; flex-direction: column; justify-content: space-between; }
+        .logo { height: 0.55in; text-align: center; }
+        .logo svg { max-width: 2.8in; max-height: 0.55in; }
+        h1, h2, p { margin: 0; }
+        h1 { font-size: 20pt; text-align: center; }
+        h2 { border: 2px solid #000; font-size: 15pt; margin: 0.45in 0 0.35in; padding: 0.12in; text-align: center; }
+        .details { font-size: 12pt; line-height: 1.5; }
+        .details strong { display: inline-block; min-width: 0.95in; }
+        .message { border-top: 2px solid #000; font-size: 13pt; line-height: 1.35; padding-top: 0.25in; text-align: center; }
+        .timestamp { font-size: 10pt; text-align: center; }
+    </style>
+</head>
+<body>
+<main>
+    <div>
+        <div class="logo" aria-label="{{ bakery_brand_name }} logo">{{ logo_svg|raw }}</div>
+        <h1>{{ bakery_brand_name }} · {{ bakedesk_brand_name }}</h1>
+        <h2>LABEL PRINTER TEST</h2>
+        <div class="details">
+            <p><strong>Printer:</strong> {{ printer.name }}</p>
+            <p><strong>Date/Time:</strong> {{ generated_at|date('M j, Y g:i A', bakery_timezone) }}</p>
+        </div>
+    </div>
+    <p class="message">If you can read this,<br>label printing is configured correctly.</p>
+</main>
+</body>
+</html>

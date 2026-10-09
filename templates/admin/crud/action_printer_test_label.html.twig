@@ -1,0 +1,17 @@
+{# @var action \EasyCorp\Bundle\EasyAdminBundle\Dto\ActionDto #}
+{# @var entity \EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto #}
+<form class="d-inline" method="post" action="{{ action.linkUrl }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('printer-test-label-' ~ entity.primaryKeyValue) }}">
+    <twig:ea:Button
+        variant="{{ action.variant }}"
+        isInvisible="{{ action.usesTextStyle }}"
+        class="{{ action.cssClass }}"
+        {{ ...action.htmlAttributes|ea_html_attrs|filter(v => v is not null) }}
+        htmlElement="button"
+        type="submit"
+        icon="{{ action.icon }}"
+    >
+        {% set action_label = action.label|trans %}
+        {%- if action_label is not empty -%}<span class="action-label">{{ action_label|raw }}</span>{%- endif -%}
+    </twig:ea:Button>
+</form>
