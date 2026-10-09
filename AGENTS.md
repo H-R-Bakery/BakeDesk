@@ -164,7 +164,11 @@ creation, or merge functionality.
 
 ## Order takers
 
-Order takers are eligible `User` records. There is no separate Employee entity.
+Order takers are `User` records; there is no separate Employee entity. A User is
+selectable for a new Order only when both `active = true` and `employee = true`.
+The `employee` property is the explicit order-taker eligibility flag, while
+`active` controls whether the User account/reference is active. User
+authentication and roles are independent of order-taker eligibility.
 
 There are currently only a small number of order takers.
 
@@ -179,6 +183,13 @@ If the previously remembered order taker is inactive or no longer exists, it mus
 Do not require user authentication for order entry.
 
 The selected User simply identifies who took the phone order.
+
+Existing Orders retain their assigned User when that User later becomes
+inactive or is no longer an eligible order taker. Editing an existing Order
+may preserve that currently assigned ineligible User, but must not expose
+unrelated ineligible Users as choices. The Admin dashboard Order Takers
+readiness check uses the same `active = true` and `employee = true` rule as
+New Order.
 
 ---
 

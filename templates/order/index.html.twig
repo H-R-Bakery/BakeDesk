@@ -39,7 +39,7 @@
             <div class="col-12 col-sm-6 col-lg-2">
                 <label class="form-label" for="order-user">Taken by</label>
                 <select class="form-select" id="order-user" name="user">
-                    <option value="">All employees</option>
+                    <option value="">All order takers</option>
                     {% for user in users %}
                         <option value="{{ user.id }}"{{ user_id == user.id ? ' selected' : '' }}>{{ user.name }}{% if not user.active %} (inactive){% endif %}</option>
                     {% endfor %}

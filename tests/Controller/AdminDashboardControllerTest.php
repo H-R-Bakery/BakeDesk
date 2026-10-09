@@ -62,6 +62,9 @@ final class AdminDashboardControllerTest extends WebTestCase
 
     public function testDashboardCountsUseOperationalStatusesAndBakeryLocalBoundaries(): void
     {
+        $orderTaker = User::new('order-taker@example.test', 'Order Taker', employee: true);
+        $this->entityManager->persist($orderTaker);
+
         $productType = (new ProductType())->setName('Donuts');
         $unit = (new Unit())->setName('Dozen')->setEachEquivalent('10.00');
         $printer = (new Printer())
@@ -104,7 +107,7 @@ final class AdminDashboardControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Needs attention.');
         self::assertSelectorTextContains('body', 'One active default printer is available for labels.');
         self::assertSelectorTextContains('body', '1 active report printer available.');
-        self::assertSelectorTextContains('body', '1 active user available in New Order.');
+        self::assertSelectorTextContains('body', '1 active order taker available in New Order.');
         self::assertSelectorTextContains('body', '1 active product type configured.');
         self::assertSelectorTextContains('body', '1 active unit configured.');
         self::assertSelectorTextContains('body', 'Review Each equivalent values before first production use.');
@@ -127,16 +130,13 @@ final class AdminDashboardControllerTest extends WebTestCase
         $reflection->setValue($printer, true);
         $this->entityManager->persist($printer);
         $this->entityManager->flush();
-        $this->admin->setActive(false);
-        $this->entityManager->flush();
-
         $this->client->loginUser($this->admin);
         $this->client->request('GET', '/admin');
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'No active default label printer is configured.');
         self::assertSelectorTextContains('body', 'No active report printer is configured. Reports remain available as PDFs.');
-        self::assertSelectorTextContains('body', 'No active users are available in the New Order form.');
+        self::assertSelectorTextContains('body', 'No active order takers are available in the New Order form.');
         self::assertSelectorTextContains('body', 'No active Product Types are configured.');
         self::assertSelectorTextContains('body', 'No active Units are configured.');
         self::assertStringNotContainsString('Unable to contact printer', (string) $this->client->getResponse()->getContent());

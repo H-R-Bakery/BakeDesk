@@ -60,6 +60,9 @@ final class OrderControllerTest extends WebTestCase
     public function testNewOrderPageShowsActiveReferenceData(): void
     {
         [$activeUser, $inactiveUser] = $this->createUsers();
+        $adminOnlyUser = User::new(email: 'admin-only@example.test', name: 'Admin Only', employee: false);
+        $this->entityManager->persist($adminOnlyUser);
+        $this->entityManager->flush();
         [$activeProductType, $inactiveProductType] = $this->createProductTypes();
         [$activeUnit, $inactiveUnit] = $this->createUnits();
 
@@ -69,6 +72,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSelectorTextContains('h1', 'New order');
         self::assertSelectorExists(sprintf('input[value="%d"]', $activeUser->getId()));
         self::assertSelectorNotExists(sprintf('input[value="%d"]', $inactiveUser->getId()));
+        self::assertSelectorNotExists(sprintf('input[value="%d"]', $adminOnlyUser->getId()));
         self::assertSelectorTextContains('select[name="new_order[items][0][productType]"]', $activeProductType->getName());
         self::assertStringNotContainsString($inactiveProductType->getName(), $crawler->filter('select[name="new_order[items][0][productType]"]')->text());
         self::assertSelectorTextContains('select[name="new_order[items][0][unit]"]', $activeUnit->getName());
@@ -331,6 +335,67 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('2026-10-12 18:45:00', $updatedOrder->getPickupAt()?->format('Y-m-d H:i:s'));
         self::assertTrue($updatedOrder->isPaid());
         self::assertSame('Updated notes', $updatedOrder->getNotes());
+    }
+
+    public function testOpenOrderEditPreservesAnInactiveCurrentOrderTakerWithoutExposingOtherIneligibleUsers(): void
+    {
+        [$eligibleUser, $inactiveUser] = $this->createUsers();
+        $unrelatedUser = User::new(email: 'unrelated@example.test', name: 'Unrelated User', employee: false);
+        $this->entityManager->persist($unrelatedUser);
+        $this->entityManager->flush();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Inactive Order Taker Customer', '+18125551234');
+        $order = $this->createOrder('3000', $inactiveUser, $productType, $unit, $customer);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists(sprintf('input[value="%d"]', $inactiveUser->getId()));
+        self::assertSelectorNotExists(sprintf('input[value="%d"]', $unrelatedUser->getId()));
+        self::assertSelectorTextContains('body', 'Inactive Employee (inactive)');
+        self::assertSelectorTextContains('body', $eligibleUser->getName());
+
+        $form = $crawler->selectButton('Save changes')->form();
+        $this->client->submit($form, $form->getPhpValues());
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $saved = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $saved);
+        self::assertSame($inactiveUser->getId(), $saved->getUser()?->getId());
+    }
+
+    public function testOpenOrderEditPreservesCurrentNonOrderTakerWithoutExposingOtherIneligibleUsers(): void
+    {
+        $currentUser = User::new(email: 'former-taker@example.test', name: 'Former Taker', employee: false);
+        $eligibleUser = User::new(email: 'eligible@example.test', name: 'Eligible Taker', employee: true);
+        $unrelatedUser = User::new(email: 'inactive-admin@example.test', name: 'Inactive Admin', employee: false)->setActive(false);
+        foreach ([$currentUser, $eligibleUser, $unrelatedUser] as $user) {
+            $this->entityManager->persist($user);
+        }
+        $this->entityManager->flush();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Former Taker Customer', '+18125551234');
+        $order = $this->createOrder('3001', $currentUser, $productType, $unit, $customer);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists(sprintf('input[value="%d"]', $currentUser->getId()));
+        self::assertSelectorNotExists(sprintf('input[value="%d"]', $unrelatedUser->getId()));
+        self::assertSelectorTextContains('body', 'Former Taker (not an order taker)');
+        self::assertSelectorTextContains('body', $eligibleUser->getName());
+
+        $form = $crawler->selectButton('Save changes')->form();
+        $this->client->submit($form, $form->getPhpValues());
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $saved = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $saved);
+        self::assertSame($currentUser->getId(), $saved->getUser()?->getId());
     }
 
     public function testEditingReassociatesToPhoneMatchWithoutRenamingExistingCustomer(): void

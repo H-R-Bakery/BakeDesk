@@ -45,7 +45,7 @@ final class AdminControllerTest extends WebTestCase
             [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
-        $this->admin = (new User())->setEmail('admin@example.test')->setRoles(['ROLE_ADMIN']);
+        $this->admin = User::new('admin@example.test', 'Admin', employee: false)->setRoles(['ROLE_ADMIN']);
         $this->admin->setPassword(self::getContainer()->get(UserPasswordHasherInterface::class)->hashPassword($this->admin, 'correct horse battery staple'));
         $this->entityManager->persist($this->admin);
         $this->entityManager->flush();
@@ -294,6 +294,36 @@ final class AdminControllerTest extends WebTestCase
                 self::assertResponseIsSuccessful($resource.' new');
             }
         }
+    }
+
+    public function testAdminUserCrudExposesAndPersistsOrderTakerAvailability(): void
+    {
+        $user = User::new('counter@example.test', 'Counter User', employee: false);
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($this->admin);
+        $this->client->request('GET', '/admin/user');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Available as order taker');
+        self::assertSelectorTextContains('body', 'Counter User');
+
+        $crawler = $this->client->request('GET', '/admin/user/'.$user->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Only active users enabled as order takers appear on the New Order form.');
+        self::assertSelectorExists('input[name$="[employee]"]');
+
+        $form = $crawler->selectButton('Save changes')->form();
+        $values = $form->getPhpValues();
+        $values['User']['employee'] = '1';
+        $this->client->submit($form, $values);
+
+        self::assertResponseRedirects();
+        $this->entityManager->clear();
+        $saved = $this->entityManager->getRepository(User::class)->find($user->getId());
+        self::assertInstanceOf(User::class, $saved);
+        self::assertTrue($saved->isEmployee());
     }
 
     public function testPackagingRuleUsingPackageUnitIsRejectedByAdminValidation(): void

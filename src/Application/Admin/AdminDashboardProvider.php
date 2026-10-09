@@ -112,8 +112,8 @@ final readonly class AdminDashboardProvider
                     title: 'Order takers',
                     level: $availableOrderTakers > 0 ? 'ok' : 'error',
                     message: $availableOrderTakers > 0
-                        ? sprintf('%d active user%s available in New Order.', $availableOrderTakers, 1 === $availableOrderTakers ? '' : 's')
-                        : 'No active users are available in the New Order form.',
+                        ? sprintf('%d active order taker%s available in New Order.', $availableOrderTakers, 1 === $availableOrderTakers ? '' : 's')
+                        : 'No active order takers are available in the New Order form.',
                     href: $this->adminIndexUrl(UserCrudController::class),
                     actionLabel: 'Manage users',
                 ),

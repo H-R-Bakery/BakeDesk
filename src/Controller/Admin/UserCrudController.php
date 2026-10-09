@@ -27,8 +27,11 @@ final class UserCrudController extends ReferenceCrudController
     {
         yield TextField::new('email', 'Email');
         yield TextField::new('name', 'Name');
-        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
-        yield IntegerField::new('sortOrder', 'Sort order')->setHelp('Lower values appear first when employees are selected for an order.');
+        yield BooleanField::new('active', 'Active')->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true);
+        yield BooleanField::new('employee', 'Available as order taker')
+            ->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true)
+            ->setHelp('Only active users enabled as order takers appear on the New Order form.');
+        yield IntegerField::new('sortOrder', 'Sort order')->setHelp('Lower values appear first when order takers are selected for an order.');
         yield TextField::new('plainPassword', 'Password')->setHelp('Leave blank to keep the current password.');
     }
 }

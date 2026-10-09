@@ -79,17 +79,18 @@ final class AppFixtures extends Fixture
         }
 
         foreach ([
-            ['Cory Baker', 'cbaker@example.com', true, ['ROLE_ADMIN']],
-            ['Adrienne Baker', 'abaker@example.com', true, ['ROLE_ADMIN']],
-            ['John Smith', 'jsmith@example.com', true, []],
-        ] as [$name, $email, $active, $roles]) {
-            $manager->persist((new User())
+            ['Cory Baker', 'cbaker@example.com', true, false, ['ROLE_ADMIN']],
+            ['Adrienne Baker', 'abaker@example.com', true, true, ['ROLE_ADMIN']],
+            ['John Smith', 'jsmith@example.com', true, true, []],
+        ] as [$name, $email, $active, $employee, $roles]) {
+            $user = (new User())
                 ->setEmail($email)
                 ->setName($name)
                 ->setActive($active)
                 ->setRoles($roles)
-                ->setPlainPassword('asdf')
-            );
+                ->setPlainPassword('asdf');
+            $user->setEmployee($employee);
+            $manager->persist($user);
         }
 
         $manager->persist((new Printer())

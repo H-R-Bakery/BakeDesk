@@ -33,10 +33,11 @@ final class NewOrderType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $users = $this->userRepository->findActiveOrdered();
+        $users = $this->userRepository->findActiveOrderTakers();
         if (true === $options['include_inactive'] && $options['data'] instanceof NewOrderData) {
-            if (null !== $options['data']->user && !$options['data']->user->isActive()) {
-                array_unshift($users, $options['data']->user);
+            $currentUser = $options['data']->user;
+            if (null !== $currentUser && (!$currentUser->isActive() || !$currentUser->isEmployee())) {
+                array_unshift($users, $currentUser);
             }
         }
 
@@ -67,10 +68,20 @@ final class NewOrderType extends AbstractType
             ->add('user', EntityType::class, [
                 'class' => User::class,
                 'choices' => $users,
-                'choice_label' => 'name',
+                'choice_label' => static function (User $user): string {
+                    $reasons = [];
+                    if (!$user->isActive()) {
+                        $reasons[] = 'inactive';
+                    }
+                    if (!$user->isEmployee()) {
+                        $reasons[] = 'not an order taker';
+                    }
+
+                    return [] === $reasons ? $user->getName() : sprintf('%s (%s)', $user->getName(), implode(', ', $reasons));
+                },
                 'expanded' => true,
                 'multiple' => false,
-                'label' => 'Employee',
+                'label' => 'Order taker',
                 'choice_attr' => static fn (User $user): array => [
                     'data-user-preference-target' => 'user',
                 ],
