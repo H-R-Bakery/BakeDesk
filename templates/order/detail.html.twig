@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+{% block title %}Order {{ order.orderNumber }} | {{ bakedesk_brand_name }}{% endblock %}
 
 {% block body %}
     {% set status_labels = {open: 'Open', completed: 'Completed', cancelled: 'Cancelled'} %}

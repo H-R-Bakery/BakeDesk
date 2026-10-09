@@ -26,7 +26,7 @@
     </head>
     <body>
         <header class="header">
-            <p class="brand">BakeDesk</p>
+            <p class="brand">{{ bakery_brand_name }} · {{ bakedesk_brand_name }}</p>
             <h1 class="title">Production Report</h1>
             <p class="date">{{ report.pickupDate|date('l, F j, Y', bakery_timezone) }}</p>
         </header>

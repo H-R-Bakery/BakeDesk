@@ -20,6 +20,7 @@ use App\Model\PrintJobStatus;
 use App\Repository\PrintJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
@@ -38,6 +39,8 @@ final class ProcessPrintJobHandler
         private readonly LoggerInterface $logger,
         private readonly ?ProductionReportPrintDocumentGenerator $reportDocumentGenerator = null,
         private readonly ?OrderRealtimePublisher $realtimePublisher = null,
+        #[Autowire('%bakedesk_brand_name%')]
+        private readonly string $bakedeskBrandName = 'BakeDesk',
     ) {
     }
 
@@ -222,7 +225,7 @@ final class ProcessPrintJobHandler
                 throw new \LogicException('A report print job requires a report date.');
             }
 
-            return sprintf('BakeDesk Production Report %s', $reportDate->format('Y-m-d'));
+            return sprintf('%s Production Report %s', $this->bakedeskBrandName, $reportDate->format('Y-m-d'));
         }
 
         $order = $printJob->getOrder();
@@ -231,10 +234,10 @@ final class ProcessPrintJobHandler
         }
 
         if (null !== $printJob->getPackageNumber() && null !== $printJob->getPackageCount()) {
-            return sprintf('BakeDesk Order #%s Box %d of %d', $order->getOrderNumber(), $printJob->getPackageNumber(), $printJob->getPackageCount());
+            return sprintf('%s Order #%s Box %d of %d', $this->bakedeskBrandName, $order->getOrderNumber(), $printJob->getPackageNumber(), $printJob->getPackageCount());
         }
 
-        return sprintf('BakeDesk Order #%s', $order->getOrderNumber());
+        return sprintf('%s Order #%s', $this->bakedeskBrandName, $order->getOrderNumber());
     }
 
     private function renderReport(PrintJob $printJob): \App\Application\Document\RenderedDocument

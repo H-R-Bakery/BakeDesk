@@ -8,6 +8,12 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     bakery_timezone: '%env(BAKERY_TIMEZONE)%'
+    bakery_brand_name: '%env(BAKERY_BRAND_NAME)%'
+    bakedesk_brand_name: '%env(BAKEDESK_BRAND_NAME)%'
+    # BAKERY_LOGO_ASSET is an AssetMapper-relative path under assets/.
+    bakery_logo_asset: '%env(BAKERY_LOGO_ASSET)%'
+    # BAKERY_PRINT_LOGO_PATH is relative to the project directory unless absolute.
+    bakery_print_logo_path: '%env(BAKERY_PRINT_LOGO_PATH)%'
 
 services:
     # default configuration for services in *this* file

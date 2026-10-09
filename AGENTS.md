@@ -571,9 +571,10 @@ operational UI uses `bakedesk:orders` for global order summaries and
 
 The administration area will use EasyAdmin.
 
-The H&R Bakery logo assets are the application branding source for the main UI,
-favicon, and EasyAdmin branding where the installed EasyAdmin version supports
-it cleanly.
+The application branding values are configured through the parameters in
+`config/services.yaml` and their environment variables. The committed defaults
+use the H&R Bakery logo assets for the main UI, favicon, EasyAdmin branding,
+and print contexts where applicable.
 
 EasyAdmin is intended for management of data such as:
 

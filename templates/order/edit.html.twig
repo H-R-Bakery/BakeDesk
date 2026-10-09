@@ -2,7 +2,7 @@
 
 {% form_theme form 'bootstrap_5_layout.html.twig' %}
 
-{% block title %}Edit Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+{% block title %}Edit Order {{ order.orderNumber }} | {{ bakedesk_brand_name }}{% endblock %}
 
 {% block body %}
     {% include 'order/_form.html.twig' with {

@@ -1,13 +1,13 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Administrator sign in | BakeDesk{% endblock %}
+{% block title %}Administrator sign in | {{ bakedesk_brand_name }}{% endblock %}
 
 {% block body %}
     <div class="row justify-content-center">
         <div class="col-12 col-md-6 col-lg-4">
             <div class="card shadow-sm">
                 <div class="card-body p-4">
-                    <h1 class="h3 mb-4">BakeDesk Login</h1>
+                    <h1 class="h3 mb-4">{{ bakedesk_brand_name }} Login</h1>
                     {% if error %}
                         <div class="alert alert-danger" role="alert">Invalid email or password.</div>
                     {% endif %}

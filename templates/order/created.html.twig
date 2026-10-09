@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Order {{ order.orderNumber }} | BakeDesk{% endblock %}
+{% block title %}Order {{ order.orderNumber }} | {{ bakedesk_brand_name }}{% endblock %}
 
 {% block body %}
     {% set print_status_labels = {queued: 'Queued', processing: 'Rendering', rendered: 'Rendered', submitted: 'Sent to printer', completed: 'Completed', failed: 'Failed', cancelled: 'Cancelled'} %}

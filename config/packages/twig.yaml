@@ -1,5 +1,9 @@
 twig:
     file_name_pattern: '*.twig'
+    globals:
+        bakery_brand_name: '%bakery_brand_name%'
+        bakedesk_brand_name: '%bakedesk_brand_name%'
+        bakery_logo_asset: '%bakery_logo_asset%'
 
 when@test:
     twig:

@@ -23,6 +23,8 @@ final class OrderLabelRenderer
         private readonly FilesystemOperator $storage,
         private readonly BakeryClock $bakeryClock,
         private readonly LoggerInterface $logger,
+        #[Autowire('%bakery_print_logo_path%')]
+        private readonly string $printLogoPath = 'assets/Images/HRBakeryLogo_bw.svg',
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDirectory = __DIR__.'/../../..',
     ) {
@@ -119,9 +121,12 @@ final class OrderLabelRenderer
 
     private function loadLogoSvg(): string
     {
-        $logo = file_get_contents($this->projectDirectory.'/assets/Images/HRBakeryLogo_bw.svg');
+        $path = str_starts_with($this->printLogoPath, '/')
+            ? $this->printLogoPath
+            : $this->projectDirectory.'/'.$this->printLogoPath;
+        $logo = file_get_contents($path);
         if (false === $logo || !str_contains($logo, '<svg')) {
-            throw new \UnexpectedValueException('The H&R Bakery label logo could not be loaded.');
+            throw new \UnexpectedValueException('The configured label logo could not be loaded.');
         }
 
         return $logo;

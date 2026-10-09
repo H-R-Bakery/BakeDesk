@@ -32,6 +32,8 @@ final class OrderCrudController extends AbstractCrudController
     public function __construct(
         #[Autowire('%bakery_timezone%')]
         private readonly string $bakeryTimezone,
+        #[Autowire('%bakedesk_brand_name%')]
+        private readonly string $bakedeskBrandName,
         private readonly UrlGeneratorInterface $urlGenerator,
     ) {
     }
@@ -52,7 +54,7 @@ final class OrderCrudController extends AbstractCrudController
 
     public function configureActions(Actions $actions): Actions
     {
-        $openInBakeDesk = Action::new('openInBakeDesk', 'Open in BakeDesk', 'fa fa-arrow-up-right-from-square')
+        $openInBakeDesk = Action::new('openInBakeDesk', 'Open in '.$this->bakedeskBrandName, 'fa fa-arrow-up-right-from-square')
             ->linkToUrl(fn (Order $order): string => $this->urlGenerator->generate('order_detail', ['id' => $order->getId()]));
 
         return $actions
