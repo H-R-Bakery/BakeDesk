@@ -14,9 +14,18 @@
         <div class="d-flex flex-wrap gap-2">
             {% if order.status.value == 'open' %}
                 <a class="btn btn-outline-primary" href="{{ path('order_edit', {id: order.id}) }}">Edit order</a>
+                <form method="post" action="{{ path('order_complete', {id: order.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('complete-order-' ~ order.id) }}">
+                    <button type="submit" class="btn btn-success">Mark Completed</button>
+                </form>
                 <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#cancel-order-modal">
                     Cancel order
                 </button>
+            {% elseif order.status.value == 'completed' %}
+                <form method="post" action="{{ path('order_reopen', {id: order.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('reopen-order-' ~ order.id) }}">
+                    <button type="submit" class="btn btn-outline-primary">Reopen Order</button>
+                </form>
             {% endif %}
             <a class="btn btn-primary" href="{{ path('order_new') }}">New order</a>
         </div>

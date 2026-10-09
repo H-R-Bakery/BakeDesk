@@ -182,6 +182,11 @@ Initial `OrderStatus` values are:
 - `COMPLETED`
 - `CANCELLED`
 
+Orders may transition from `OPEN` to `COMPLETED`, and accidentally completed
+orders may transition from `COMPLETED` back to `OPEN`. `CANCELLED` is terminal
+for V1. Paid state and order lifecycle status are independent; completing an
+unpaid order does not change its payment state.
+
 Cancelled orders must be retained.
 
 Do not delete an order merely because it was cancelled.
@@ -296,8 +301,9 @@ Production reports are generated for a selected pickup date.
 
 Production report totals are grouped by ProductType and convert every
 contributing OrderItem to Each using the Unit's current eachEquivalent. Report
-totals are independent of package and label allocation, exclude CANCELLED
-Orders, and use one shared report model for browser and PDF output.
+totals are independent of package and label allocation, include `OPEN` and
+`COMPLETED` Orders, exclude `CANCELLED` Orders, and use one shared report model
+for browser and PDF output.
 
 V1 uses simple reporting rather than a normalized product catalog.
 
@@ -531,6 +537,9 @@ Potential realtime information includes:
 The database remains the source of truth.
 
 Mercure updates are notifications, not durable state.
+
+Order lifecycle state changes publish best-effort Mercure order updates after
+successful persistence. Publication failure does not fail the state change.
 
 A browser that reconnects must be able to retrieve current state from Symfony/PostgreSQL.
 

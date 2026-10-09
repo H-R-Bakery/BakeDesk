@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Order\OrderNumberGenerator;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Customer;
 use App\Entity\Order;
 use App\Entity\OrderItem;
@@ -22,8 +23,10 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use libphonenumber\PhoneNumberUtil;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Mercure\HubInterface;
 
 final class OrderControllerTest extends WebTestCase
 {
@@ -472,6 +475,150 @@ final class OrderControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Cancelled');
         self::assertSelectorNotExists('a[href="/orders/'.$orderId.'/edit"]');
         self::assertSelectorNotExists('#cancel-order-modal');
+        self::assertSelectorNotExists('form[action="/orders/'.$orderId.'/complete"]');
+        self::assertSelectorNotExists('form[action="/orders/'.$orderId.'/reopen"]');
+    }
+
+    public function testOpenOrderCanBeCompletedAndReopenedWithoutChangingPaymentOrPrintJobs(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Workflow Customer', '+18125551234');
+        $order = $this->createOrder('3007', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printer = $this->createDefaultLabelPrinter('Workflow printer');
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::QUEUED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+        $printJobId = $printJob->getId();
+
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::exactly(2))->method('publish')->willReturn('update-id');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        self::assertSelectorExists('form[action="/orders/'.$order->getId().'/complete"]');
+        self::assertSelectorTextContains('body', 'Mark Completed');
+        $completeToken = $crawler->filter('form[action="/orders/'.$order->getId().'/complete"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/complete', ['_token' => $completeToken]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $completed = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $completed);
+        self::assertSame(OrderStatus::COMPLETED, $completed->getStatus());
+        self::assertFalse($completed->isPaid());
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertSame($printJobId, $this->entityManager->getRepository(PrintJob::class)->find($printJobId)?->getId());
+        self::assertCount(0, self::getContainer()->get('messenger.transport.print')->getSent());
+
+        $this->client->request('GET', '/orders');
+        self::assertSelectorNotExists('#orders-table');
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        self::assertSelectorTextContains('body', 'Completed');
+        self::assertSelectorExists('form[action="/orders/'.$order->getId().'/reopen"]');
+        self::assertSelectorTextContains('body', 'Reopen Order');
+        $reopenToken = $crawler->filter('form[action="/orders/'.$order->getId().'/reopen"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/reopen', ['_token' => $reopenToken]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $reopened = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $reopened);
+        self::assertSame(OrderStatus::OPEN, $reopened->getStatus());
+        self::assertFalse($reopened->isPaid());
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+
+        $this->client->request('GET', '/orders');
+        self::assertSelectorTextContains('#orders-table', '3007');
+    }
+
+    public function testCompletionAndReopeningRequireTheirScopedCsrfTokens(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('CSRF Workflow Customer', '+18125551234');
+        $open = $this->createOrder('3008', $user, $productType, $unit, $customer);
+        $completed = $this->createOrder('3009', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::never())->method('publish');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $this->client->request('POST', '/orders/'.$open->getId().'/complete');
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('POST', '/orders/'.$completed->getId().'/reopen', ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+
+        $this->entityManager->clear();
+        self::assertSame(OrderStatus::OPEN, $this->entityManager->getRepository(Order::class)->find($open->getId())?->getStatus());
+        self::assertSame(OrderStatus::COMPLETED, $this->entityManager->getRepository(Order::class)->find($completed->getId())?->getStatus());
+    }
+
+    public function testInvalidOrderWorkflowTransitionsAreRejectedWithoutStateChanges(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Invalid Workflow Customer', '+18125551234');
+        $completedForCompletion = $this->createOrder('3011', $user, $productType, $unit, $customer);
+        $cancelledForCompletion = $this->createOrder('3012', $user, $productType, $unit, $customer);
+        $openForReopening = $this->createOrder('3013', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $cancelledForReopening = $this->createOrder('3014', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::never())->method('publish');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $crawler = $this->client->request('GET', '/orders/'.$completedForCompletion->getId());
+        $completeToken = $crawler->filter('form[action="/orders/'.$completedForCompletion->getId().'/complete"] input[name="_token"]')->attr('value');
+        $this->entityManager->getConnection()->executeStatement('UPDATE bakery_order SET status = ? WHERE order_number = ?', [OrderStatus::COMPLETED->value, '3011']);
+        $this->entityManager->clear();
+        $this->client->request('POST', '/orders/'.$completedForCompletion->getId().'/complete', ['_token' => $completeToken]);
+        self::assertResponseRedirects();
+
+        $crawler = $this->client->request('GET', '/orders/'.$cancelledForCompletion->getId());
+        $completeToken = $crawler->filter('form[action="/orders/'.$cancelledForCompletion->getId().'/complete"] input[name="_token"]')->attr('value');
+        $this->entityManager->getConnection()->executeStatement('UPDATE bakery_order SET status = ? WHERE order_number = ?', [OrderStatus::CANCELLED->value, '3012']);
+        $this->entityManager->clear();
+        $this->client->request('POST', '/orders/'.$cancelledForCompletion->getId().'/complete', ['_token' => $completeToken]);
+        self::assertResponseRedirects();
+
+        $crawler = $this->client->request('GET', '/orders/'.$openForReopening->getId());
+        $reopenToken = $crawler->filter('form[action="/orders/'.$openForReopening->getId().'/reopen"] input[name="_token"]')->attr('value');
+        $this->entityManager->getConnection()->executeStatement('UPDATE bakery_order SET status = ? WHERE order_number = ?', [OrderStatus::OPEN->value, '3013']);
+        $this->entityManager->clear();
+        $this->client->request('POST', '/orders/'.$openForReopening->getId().'/reopen', ['_token' => $reopenToken]);
+        self::assertResponseRedirects();
+
+        $crawler = $this->client->request('GET', '/orders/'.$cancelledForReopening->getId());
+        $reopenToken = $crawler->filter('form[action="/orders/'.$cancelledForReopening->getId().'/reopen"] input[name="_token"]')->attr('value');
+        $this->entityManager->getConnection()->executeStatement('UPDATE bakery_order SET status = ? WHERE order_number = ?', [OrderStatus::CANCELLED->value, '3014']);
+        $this->entityManager->clear();
+        $this->client->request('POST', '/orders/'.$cancelledForReopening->getId().'/reopen', ['_token' => $reopenToken]);
+        self::assertResponseRedirects();
+
+        $actions = [
+            ['3011', OrderStatus::COMPLETED],
+            ['3012', OrderStatus::CANCELLED],
+            ['3013', OrderStatus::OPEN],
+            ['3014', OrderStatus::CANCELLED],
+        ];
+
+        $this->entityManager->clear();
+        foreach ($actions as [$orderNumber, $status]) {
+            self::assertSame($status, $this->entityManager->getRepository(Order::class)->findOneBy(['orderNumber' => $orderNumber])?->getStatus());
+        }
     }
 
     public function testCompletedAndCancelledOrdersCannotBeEdited(): void

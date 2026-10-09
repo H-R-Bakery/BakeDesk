@@ -9,7 +9,9 @@ use App\Application\Document\OrderLabelRenderingException;
 use App\Application\Order\BakeryClock;
 use App\Application\Order\NewOrderInputFactory;
 use App\Application\Order\OrderCanceller;
+use App\Application\Order\OrderCompleter;
 use App\Application\Order\OrderFormDataFactory;
+use App\Application\Order\OrderReopener;
 use App\Application\Order\OrderSearchCriteria;
 use App\Application\Order\OrderUpdater;
 use App\Application\Packaging\OrderPackageCalculator;
@@ -391,6 +393,48 @@ final class OrderController extends AbstractController
 
         $orderCanceller->cancel($order);
         $this->addFlash('success', sprintf('Order #%s cancelled.', $order->getOrderNumber()));
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
+    }
+
+    #[Route('/orders/{id<\d+>}/complete', name: 'order_complete', methods: ['POST'])]
+    public function complete(int $id, Request $request, OrderRepository $orderRepository, OrderCompleter $orderCompleter): Response
+    {
+        $order = $orderRepository->find($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (!$this->isCsrfTokenValid('complete-order-'.$id, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+
+        try {
+            $orderCompleter->complete($order);
+            $this->addFlash('success', sprintf('Order #%s marked completed.', $order->getOrderNumber()));
+        } catch (\LogicException) {
+            $this->addFlash('warning', sprintf('Order #%s could not be marked completed because it is no longer open.', $order->getOrderNumber()));
+        }
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
+    }
+
+    #[Route('/orders/{id<\d+>}/reopen', name: 'order_reopen', methods: ['POST'])]
+    public function reopen(int $id, Request $request, OrderRepository $orderRepository, OrderReopener $orderReopener): Response
+    {
+        $order = $orderRepository->find($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (!$this->isCsrfTokenValid('reopen-order-'.$id, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+
+        try {
+            $orderReopener->reopen($order);
+            $this->addFlash('success', sprintf('Order #%s reopened.', $order->getOrderNumber()));
+        } catch (\LogicException) {
+            $this->addFlash('warning', sprintf('Order #%s could not be reopened because it is not completed.', $order->getOrderNumber()));
+        }
 
         return $this->redirectToRoute('order_detail', ['id' => $id]);
     }
