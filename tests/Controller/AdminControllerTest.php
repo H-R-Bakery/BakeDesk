@@ -13,7 +13,9 @@ use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Entity\User;
+use App\Model\OrderStatus;
 use App\Model\PrintDocumentType;
+use App\Model\PrintJobStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -63,6 +65,26 @@ final class AdminControllerTest extends WebTestCase
 
         $this->client->request('GET', '/order/new');
         self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('a[href="/admin"]');
+        self::assertSelectorExists('img.navbar-brand-logo');
+        self::assertStringContainsString('HRBakeryLogo', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testAnonymousCannotAccessOrderAdmin(): void
+    {
+        $this->client->request('GET', '/admin/order');
+
+        self::assertResponseRedirects('/admin/login');
+    }
+
+    public function testAdminSeesAdminLinkOnPublicPages(): void
+    {
+        $this->client->loginUser($this->admin);
+        $this->client->request('GET', '/order/new');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('a[href="/admin"]');
+        self::assertSelectorTextContains('a[href="/admin"]', 'Admin');
     }
 
     public function testAdminCanLogInSeeDashboardAndLogOut(): void
@@ -79,6 +101,7 @@ final class AdminControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'BakeDesk');
         self::assertSelectorTextContains('body', 'Customers');
+        self::assertSelectorTextContains('body', 'Orders');
         self::assertSelectorTextContains('body', 'Print Jobs');
 
         $this->client->request('GET', '/admin/logout');
@@ -99,6 +122,7 @@ final class AdminControllerTest extends WebTestCase
         self::assertStringNotContainsString('Create new', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('Edit', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('Delete', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('data-action-name="batchDelete"', (string) $this->client->getResponse()->getContent());
 
         $printer = (new Printer())->setName('History printer')->setAddress('ipp://printer.example/print');
         $printJob = (new PrintJob())->setPrinter($printer)->setDocumentType(PrintDocumentType::LABEL);
@@ -110,15 +134,134 @@ final class AdminControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    public function testOrderCrudIsHistoryOnlyAndLinksToOperationalDetail(): void
+    {
+        $customer = (new Customer())
+            ->setName('Order History Customer')
+            ->setPhone(\libphonenumber\PhoneNumberUtil::getInstance()->parse('+18125550123', 'US'));
+        $productType = (new ProductType())->setName('Donuts');
+        $unit = (new Unit())->setName('Each');
+        $order = (new Order())
+            ->setOrderNumber('9001')
+            ->setCustomer($customer)
+            ->setUser($this->admin)
+            ->setPickupAt(new \DateTimeImmutable('2026-10-10 09:00:00', new \DateTimeZone('UTC')))
+            ->setOrderedAt(new \DateTimeImmutable('2026-10-09 12:00:00', new \DateTimeZone('UTC')))
+            ->setStatus(OrderStatus::OPEN)
+            ->setNotes('History note');
+        $order->addItem((new OrderItem())
+            ->setProductType($productType)
+            ->setUnit($unit)
+            ->setQuantity('6')
+            ->setDescription('Glazed'));
+        $this->entityManager->persist($customer);
+        $this->entityManager->persist($productType);
+        $this->entityManager->persist($unit);
+        $this->entityManager->persist($order);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($this->admin);
+        $this->client->request('GET', '/admin/order');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', '9001');
+        self::assertSelectorTextContains('body', 'Order History Customer');
+        self::assertStringContainsString('/orders/'.$order->getId(), (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Create new', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Edit', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Delete', (string) $this->client->getResponse()->getContent());
+
+        $this->client->request('GET', '/admin/order/new');
+        self::assertResponseStatusCodeSame(403);
+
+        $this->client->request('GET', '/admin/order/'.$order->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'History note');
+        self::assertSelectorTextContains('body', 'Glazed');
+        self::assertStringNotContainsString('Edit', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testPrintJobCanBeCancelledBeforeSubmissionAndCannotAfterSubmission(): void
+    {
+        $printer = (new Printer())->setName('Admin printer')->setAddress('ipp://printer.example/admin');
+        $queued = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::QUEUED)
+            ->setDocumentPath('labels/shared.pdf')
+            ->setAttemptCount(2);
+        $submitted = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::SUBMITTED);
+        $this->entityManager->persist($printer);
+        $this->entityManager->persist($queued);
+        $this->entityManager->persist($submitted);
+        $this->entityManager->flush();
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/admin/print-job');
+        $cancelToken = $crawler->filter('form[action$="/admin/print-job/'.$queued->getId().'/cancel"] input[name="_token"]')->attr('value');
+        self::assertNotNull($cancelToken);
+        $this->client->request('POST', '/admin/print-job/'.$queued->getId().'/cancel', [
+            '_token' => $cancelToken,
+        ]);
+
+        self::assertResponseRedirects();
+        $this->entityManager->clear();
+        $cancelled = $this->entityManager->getRepository(PrintJob::class)->find($queued->getId());
+        self::assertInstanceOf(PrintJob::class, $cancelled);
+        self::assertSame(PrintJobStatus::CANCELLED, $cancelled->getStatus());
+        self::assertSame('labels/shared.pdf', $cancelled->getDocumentPath());
+        self::assertSame(2, $cancelled->getAttemptCount());
+
+        $this->client->request('POST', '/admin/print-job/'.$submitted->getId().'/cancel', [
+            '_token' => $cancelToken,
+        ]);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame(PrintJobStatus::SUBMITTED, $this->entityManager->getRepository(PrintJob::class)->find($submitted->getId())?->getStatus());
+    }
+
+    public function testTerminalPrintJobCanBeDeletedWithoutDeletingPrinter(): void
+    {
+        $printer = (new Printer())->setName('Retained printer')->setAddress('ipp://printer.example/retained');
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::REPORT)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setDocumentPath('reports/shared.pdf');
+        $this->entityManager->persist($printer);
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+        $printJobId = $printJob->getId();
+        $printerId = $printer->getId();
+
+        $this->client->loginUser($this->admin);
+        $crawler = $this->client->request('GET', '/admin/print-job');
+        $deleteToken = $crawler->filter('#action-confirmation-form input[name="token"]')->attr('value');
+        self::assertNotNull($deleteToken);
+        $this->client->request('POST', '/admin/print-job/'.$printJobId.'/delete', [
+            'token' => $deleteToken,
+        ]);
+
+        self::assertResponseRedirects();
+        self::assertNull($this->entityManager->getRepository(PrintJob::class)->find($printJobId));
+        self::assertInstanceOf(Printer::class, $this->entityManager->getRepository(Printer::class)->find($printerId));
+    }
+
     public function testAllAdministrationCrudPagesRender(): void
     {
         $this->client->loginUser($this->admin);
 
-        foreach (['customer', 'user', 'product-type', 'unit', 'packaging-rule', 'printer'] as $resource) {
+        foreach (['order', 'customer', 'user', 'product-type', 'unit', 'packaging-rule', 'printer'] as $resource) {
             $this->client->request('GET', '/admin/'.$resource);
             self::assertResponseIsSuccessful($resource);
-            $this->client->request('GET', '/admin/'.$resource.'/new');
-            self::assertResponseIsSuccessful($resource.' new');
+            if ('order' !== $resource) {
+                $this->client->request('GET', '/admin/'.$resource.'/new');
+                self::assertResponseIsSuccessful($resource.' new');
+            }
         }
     }
 

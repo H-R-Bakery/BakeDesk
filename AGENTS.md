@@ -40,6 +40,10 @@ The `/admin` area must require authentication.
 EasyAdmin is used only for secured administrator-managed reference and configuration data.
 The normal bakery operational UI remains purpose-built and unauthenticated for V1.
 PackagingRules and Printers are managed through the administration area.
+The main operational navbar may link to the EasyAdmin dashboard only for visitors
+with `ROLE_ADMIN`. EasyAdmin Order management is for inspection and history;
+operational order creation and editing remain in the purpose-built BakeDesk UI.
+Orders must not be deleted.
 
 ---
 
@@ -440,6 +444,12 @@ actions are asynchronous and use POST routes protected by scoped CSRF tokens.
 
 Never put Doctrine entities directly into Messenger messages.
 
+Administrators may cancel PrintJobs only while they are `QUEUED`, `PROCESSING`,
+or `RENDERED`; arbitrary PrintJob status editing remains forbidden. Terminal
+PrintJobs (`COMPLETED`, `FAILED`, or `CANCELLED`) may be deleted administratively
+with confirmation. Deleting a PrintJob does not imply deleting its generated
+Flysystem document, which may be shared by retries or report paths.
+
 Messenger messages should contain scalar identifiers, such as a `PrintJob` ID.
 
 ---
@@ -560,6 +570,10 @@ operational UI uses `bakedesk:orders` for global order summaries and
 ## Administration
 
 The administration area will use EasyAdmin.
+
+The H&R Bakery logo assets are the application branding source for the main UI,
+favicon, and EasyAdmin branding where the installed EasyAdmin version supports
+it cleanly.
 
 EasyAdmin is intended for management of data such as:
 

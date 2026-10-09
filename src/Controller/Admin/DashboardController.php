@@ -22,20 +22,25 @@ final class DashboardController extends AbstractDashboardController
 
     public function configureDashboard(): Dashboard
     {
-        return Dashboard::new()->setTitle('BakeDesk');
+        return Dashboard::new()
+            ->setTitle('H&R Bakery · BakeDesk Administration')
+            ->setFaviconPath('Images/HRBakeryLogo.svg');
     }
 
     public function configureMenuItems(): iterable
     {
         yield MenuItem::linkToDashboard('Dashboard', 'fa fa-home');
-        yield MenuItem::section('Administration');
+        yield MenuItem::section('Operations');
+        yield MenuItem::linkTo(OrderCrudController::class, 'Orders', 'fa fa-receipt');
+        yield MenuItem::linkTo(PrintJobCrudController::class, 'Print Jobs', 'fa fa-list-check');
+        yield MenuItem::section('People');
         yield MenuItem::linkTo(UserCrudController::class, 'Users', 'fa fa-user-tie');
         yield MenuItem::linkTo(CustomerCrudController::class, 'Customers', 'fa fa-users');
+        yield MenuItem::section('Catalog / Configuration');
         yield MenuItem::linkTo(ProductTypeCrudController::class, 'Product Types', 'fa fa-cookie-bite');
         yield MenuItem::linkTo(UnitCrudController::class, 'Units', 'fa fa-box');
         yield MenuItem::linkTo(PackagingRuleCrudController::class, 'Packaging Rules', 'fa fa-boxes-stacked');
         yield MenuItem::linkTo(PrinterCrudController::class, 'Printers', 'fa fa-print');
-        yield MenuItem::linkTo(PrintJobCrudController::class, 'Print Jobs', 'fa fa-list-check');
         yield MenuItem::section();
         yield MenuItem::linkToRoute('Back to BakeDesk', 'fa fa-arrow-left', 'order_new');
     }

@@ -1,5 +1,19 @@
+:root {
+    --navbar-bg-color: rgb(8, 97, 158);
+}
+
 body {
     min-width: 320px;
+}
+
+.navbar {
+    background-color: var(--navbar-bg-color) !important;
+}
+
+.navbar-brand-logo {
+    width: clamp(7rem, 18vw, 10rem);
+    height: auto;
+    max-height: 2.25rem;
 }
 
 .autocomplete-results {
