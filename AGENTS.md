@@ -332,6 +332,12 @@ Reports must be available for download.
 
 Reports may also be asynchronously sent to an IPP printer configured for report printing.
 
+User-initiated report printing creates a `PrintDocumentType::REPORT` `PrintJob`
+for the explicitly selected active report printer and dispatches it through
+Messenger. Report rendering reuses `ProductionReportBuilder` and the browser
+PDF renderer. Label-specific printer options must not be applied to report
+jobs.
+
 ---
 
 ## Printers
@@ -374,6 +380,10 @@ Order controllers, report controllers, and Messenger handlers must not contain r
 Printing-related responsibilities should be separated so that another IPP implementation can be substituted later.
 
 BakeDesk performs IPP printing through the selected PHP IPP client behind `PrinterClientInterface`. The configured printer address remains the complete direct or CUPS IPP URI.
+
+Production report printing is initiated by the user for a selected report
+date and printer. It remains asynchronous through the durable `PrintJob` and
+Messenger pipeline; scheduled report printing is outside V1.
 
 ### Label document rendering and storage
 

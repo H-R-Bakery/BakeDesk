@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Printing;
 
 use App\Entity\Printer;
+use App\Model\PrintDocumentType;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Target;
@@ -19,9 +20,9 @@ final class IppPrinterClient implements PrinterClientInterface
     ) {
     }
 
-    public function submitPdf(Printer $printer, string $documentPath, string $jobName): PrintSubmission
+    public function submitPdf(Printer $printer, string $documentPath, string $jobName, PrintDocumentType $documentType = PrintDocumentType::LABEL): PrintSubmission
     {
-        $this->assertPrinterCanReceiveLabels($printer);
+        $this->assertPrinterCanReceive($printer, $documentType);
         if ('' === $documentPath) {
             throw PrinterSubmissionException::rejected('The print job has no rendered document path.');
         }
@@ -33,7 +34,7 @@ final class IppPrinterClient implements PrinterClientInterface
         }
 
         if (!str_starts_with($pdf, '%PDF-')) {
-            throw PrinterSubmissionException::rejected('The rendered label is not a PDF document.');
+            throw PrinterSubmissionException::rejected('The rendered document is not a PDF document.');
         }
 
         $status = $this->getPrinterStatus($printer);
@@ -74,14 +75,18 @@ final class IppPrinterClient implements PrinterClientInterface
         return $this->transport->getJobStatus($printer, $externalJobId);
     }
 
-    private function assertPrinterCanReceiveLabels(Printer $printer): void
+    private function assertPrinterCanReceive(Printer $printer, PrintDocumentType $documentType): void
     {
         $this->assertPrinterAddress($printer);
         if (!$printer->isActive()) {
             throw PrinterSubmissionException::rejected('The configured printer is inactive.');
         }
-        if (!$printer->isForLabels()) {
+
+        if (PrintDocumentType::LABEL === $documentType && !$printer->isForLabels()) {
             throw PrinterSubmissionException::rejected('The configured printer is not enabled for labels.');
+        }
+        if (PrintDocumentType::REPORT === $documentType && !$printer->isForReports()) {
+            throw PrinterSubmissionException::rejected('The configured printer is not enabled for reports.');
         }
     }
 

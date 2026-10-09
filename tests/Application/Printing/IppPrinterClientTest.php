@@ -10,6 +10,7 @@ use App\Application\Printing\PrinterState;
 use App\Application\Printing\PrinterStatus;
 use App\Application\Printing\PrintSubmission;
 use App\Entity\Printer;
+use App\Model\PrintDocumentType;
 use League\Flysystem\FilesystemOperator;
 use PHPUnit\Framework\TestCase;
 
@@ -79,5 +80,34 @@ final class IppPrinterClientTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         (new IppPrinterClient($transport, $storage))->submitPdf($printer, 'label.pdf', 'BakeDesk Order #1234');
+    }
+
+    public function testReportPrinterCanReceivePdfWithoutLabelCapability(): void
+    {
+        $printer = (new Printer())
+            ->setName('Development report printer')
+            ->setAddress('ipp://printer.example/ipp/report')
+            ->setForReports(true);
+        $storage = $this->createMock(FilesystemOperator::class);
+        $storage->expects(self::once())->method('read')->with('reports/production/report.pdf')->willReturn('%PDF-1.7 report');
+        $transport = $this->createMock(IppTransportInterface::class);
+        $transport->expects(self::once())->method('getPrinterStatus')->with($printer)->willReturn(new PrinterStatus(
+            PrinterState::IDLE,
+            true,
+            documentFormatsSupported: ['application/pdf'],
+        ));
+        $transport->expects(self::once())
+            ->method('submitPdf')
+            ->with($printer, '%PDF-1.7 report', 'BakeDesk Production Report 2026-10-09')
+            ->willReturn(new PrintSubmission('18'));
+
+        $submission = (new IppPrinterClient($transport, $storage))->submitPdf(
+            $printer,
+            'reports/production/report.pdf',
+            'BakeDesk Production Report 2026-10-09',
+            PrintDocumentType::REPORT,
+        );
+
+        self::assertSame('18', $submission->externalJobId);
     }
 }

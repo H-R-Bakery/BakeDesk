@@ -10,15 +10,21 @@ use App\Entity\Customer;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Entity\PackagingRule;
+use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Entity\ProductType;
 use App\Entity\Unit;
 use App\Entity\User;
+use App\Message\ProcessPrintJob;
 use App\Model\OrderStatus;
+use App\Model\PrintDocumentType;
+use App\Model\PrintJobStatus;
+use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use libphonenumber\PhoneNumberUtil;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class ProductionReportControllerTest extends WebTestCase
 {
@@ -138,6 +144,8 @@ final class ProductionReportControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('No production items found for this pickup date.', (string) $this->client->getResponse()->getContent());
+        self::assertSelectorTextContains('.alert-secondary', 'No report printers are configured.');
+        self::assertSelectorNotExists('select[name="printer"]');
 
         $this->client->request('GET', '/reports/production?date=not-a-date');
 
@@ -172,6 +180,85 @@ final class ProductionReportControllerTest extends WebTestCase
         self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
     }
 
+    public function testOnlyActiveReportPrintersAppearInThePrintForm(): void
+    {
+        $this->createPrinter('Kitchen report printer', true, true);
+        $this->createPrinter('Inactive report printer', false, true);
+        $this->createPrinter('Label-only printer', true, false);
+
+        $this->client->request('GET', '/reports/production?date=2026-10-09');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Kitchen report printer', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Inactive report printer', (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Label-only printer', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testValidPrintRequestQueuesReportJobAndRedirectsToSelectedDate(): void
+    {
+        $printer = $this->createPrinter('Kitchen report printer', true, true);
+        $transport = self::getContainer()->get('messenger.transport.print');
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+
+        $token = $this->printFormToken();
+        $this->client->request('POST', '/reports/production/print', [
+            '_token' => $token,
+            'date' => '2026-10-09',
+            'printer' => (string) $printer->getId(),
+        ]);
+
+        self::assertResponseRedirects('/reports/production?date=2026-10-09');
+        $sent = $transport->getSent();
+        self::assertCount(1, $sent);
+        self::assertInstanceOf(ProcessPrintJob::class, $sent[0]->getMessage());
+        $this->client->followRedirect();
+        self::assertStringContainsString('Production report for October 9, 2026 queued for Kitchen report printer.', (string) $this->client->getResponse()->getContent());
+        $printJob = $this->entityManager->getRepository(PrintJob::class)->findOneBy([]);
+        self::assertInstanceOf(PrintJob::class, $printJob);
+        self::assertSame($printJob->getId(), $sent[0]->getMessage()->printJobId);
+        self::assertSame(PrintDocumentType::REPORT, $printJob->getDocumentType());
+        self::assertSame(PrintJobStatus::QUEUED, $printJob->getStatus());
+        self::assertSame('2026-10-09', $printJob->getReportDate()?->format('Y-m-d'));
+        self::assertSame($printer->getId(), $printJob->getPrinter()?->getId());
+        self::assertNull($printJob->getOrder());
+        self::assertNull($printJob->getOrderItem());
+        self::assertNull($printJob->getPackageNumber());
+        self::assertNull($printJob->getPackageCount());
+        self::assertNull($printJob->getPackageQuantity());
+        self::assertNull($printJob->getDocumentPath());
+    }
+
+    public function testPrintRequestRequiresCsrfAndRejectsUnavailablePrinters(): void
+    {
+        $inactive = $this->createPrinter('Inactive report printer', false, true);
+        $labelOnly = $this->createPrinter('Label-only printer', true, false);
+        $this->createPrinter('Valid report printer', true, true);
+        $token = $this->printFormToken();
+
+        foreach ([['bad-token', $inactive], [$token, $labelOnly]] as [$csrfToken, $printer]) {
+            $this->client->request('POST', '/reports/production/print', [
+                '_token' => $csrfToken,
+                'date' => '2026-10-09',
+                'printer' => (string) $printer->getId(),
+            ]);
+
+            if ('bad-token' === $csrfToken) {
+                self::assertResponseStatusCodeSame(403);
+            } else {
+                self::assertResponseRedirects('/reports/production?date=2026-10-09');
+            }
+        }
+
+        $this->client->request('POST', '/reports/production/print', [
+            '_token' => $token,
+            'date' => '2026-10-09',
+            'printer' => '999999',
+        ]);
+
+        self::assertResponseRedirects('/reports/production?date=2026-10-09');
+        self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
+    }
+
     protected function setUp(): void
     {
         $_ENV['DATABASE_URL'] = 'sqlite:///:memory:';
@@ -187,9 +274,12 @@ final class ProductionReportControllerTest extends WebTestCase
 
         $metadata = array_map(
             $this->entityManager->getClassMetadata(...),
-            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, \App\Entity\Printer::class, PrintJob::class],
+            [Customer::class, User::class, ProductType::class, Unit::class, Order::class, OrderItem::class, PackagingRule::class, Printer::class, PrintJob::class],
         );
         (new SchemaTool($this->entityManager))->createSchema($metadata);
+        if ($this->entityManager->getConnection()->getDatabasePlatform() instanceof SQLitePlatform) {
+            $this->entityManager->getConnection()->executeStatement('DROP INDEX uniq_printer_default_for_labels');
+        }
 
         $this->user = User::new(email: 'report@example.com', name: 'Report Employee', employee: true)->setPlainPassword('test-password');
         $this->donuts = (new ProductType())->setName('Donuts')->setSortOrder(10);
@@ -238,5 +328,25 @@ final class ProductionReportControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         return $customer;
+    }
+
+    private function createPrinter(string $name, bool $active, bool $forReports): Printer
+    {
+        $printer = (new Printer())
+            ->setName($name)
+            ->setAddress('ipp://printer.example/'.$name)
+            ->setActive($active)
+            ->setForReports($forReports);
+        $this->entityManager->persist($printer);
+        $this->entityManager->flush();
+
+        return $printer;
+    }
+
+    private function printFormToken(): string
+    {
+        $this->client->request('GET', '/reports/production?date=2026-10-09');
+
+        return (string) $this->client->getCrawler()->filter('input[name="_token"]')->attr('value');
     }
 }

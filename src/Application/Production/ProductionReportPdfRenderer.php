@@ -24,11 +24,14 @@ final readonly class ProductionReportPdfRenderer
     ) {
     }
 
-    public function render(ProductionReport $report): RenderedDocument
+    public function render(ProductionReport $report, ?string $pathSuffix = null): RenderedDocument
     {
         $date = $report->pickupDate->format('Y-m-d');
 
         try {
+            $filenameStem = null === $pathSuffix
+                ? sprintf('production-%s', $date)
+                : sprintf('production-%s-%s', $date, $pathSuffix);
             $html = $this->twig->render('report/production.pdf.html.twig', [
                 'report' => $report,
                 'bakery_timezone' => $this->bakeryClock->getTimezoneName(),
@@ -37,13 +40,13 @@ final readonly class ProductionReportPdfRenderer
                 $html,
                 '8.5in',
                 '11in',
-                sprintf('production-%s', $date),
+                $filenameStem,
             );
             if (!str_starts_with($contents, '%PDF-')) {
                 throw new \UnexpectedValueException('Gotenberg returned an invalid PDF document.');
             }
 
-            $filename = sprintf('production-%s.pdf', $date);
+            $filename = sprintf('%s.pdf', $filenameStem);
             $path = sprintf(
                 'reports/production/%s/%s/%s',
                 $report->pickupDate->format('Y'),

@@ -23,4 +23,15 @@ class PrinterRepository extends AbstractServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * @return list<Printer>
+     */
+    public function findAvailableForReports(): array
+    {
+        return $this->findBy(
+            ['active' => true, 'forReports' => true],
+            ['name' => 'ASC', 'id' => 'ASC'],
+        );
+    }
 }

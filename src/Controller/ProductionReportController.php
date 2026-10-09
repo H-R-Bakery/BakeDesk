@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Application\Order\BakeryClock;
+use App\Application\Printing\ReportPrinterUnavailableException;
+use App\Application\Printing\ReportPrintJobCreator;
 use App\Application\Production\ProductionReportBuilder;
 use App\Application\Production\ProductionReportPdfRenderer;
 use App\Application\Production\ProductionReportRenderingException;
+use App\Entity\Printer;
+use App\Repository\PrinterRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
@@ -19,14 +24,55 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ProductionReportController extends AbstractController
 {
     #[Route('/reports/production', name: 'production_report', methods: ['GET'])]
-    public function index(Request $request, BakeryClock $bakeryClock, ProductionReportBuilder $reportBuilder): Response
+    public function index(Request $request, BakeryClock $bakeryClock, ProductionReportBuilder $reportBuilder, PrinterRepository $printerRepository): Response
     {
         $report = $reportBuilder->build($this->parseReportDate($request, $bakeryClock));
 
         return $this->render('report/production.html.twig', [
             'report' => $report,
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
+            'report_printers' => $printerRepository->findAvailableForReports(),
         ]);
+    }
+
+    #[Route('/reports/production/print', name: 'production_report_print', methods: ['POST'])]
+    public function printReport(
+        Request $request,
+        BakeryClock $bakeryClock,
+        PrinterRepository $printerRepository,
+        ReportPrintJobCreator $printJobCreator,
+    ): Response {
+        if (!$this->isCsrfTokenValid('print_report', (string) $request->request->get('_token'))) {
+            return new Response('The production report print form is invalid.', Response::HTTP_FORBIDDEN);
+        }
+
+        $reportDate = $this->parseReportDate($request, $bakeryClock, $request->request);
+        $printerId = filter_var($request->request->get('printer'), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        $printer = false === $printerId ? null : $printerRepository->find($printerId);
+
+        if (!$printer instanceof Printer || !$printer->isActive() || !$printer->isForReports()) {
+            $this->addFlash('error', 'The selected printer is not available for reports.');
+
+            return $this->redirectToReportDate($reportDate);
+        }
+
+        try {
+            $printJobCreator->createAndDispatch($printer, $reportDate);
+        } catch (ReportPrinterUnavailableException) {
+            $this->addFlash('error', 'The selected printer is not available for reports.');
+
+            return $this->redirectToReportDate($reportDate);
+        }
+
+        $this->addFlash('success', sprintf(
+            'Production report for %s queued for %s.',
+            $reportDate->format('F j, Y'),
+            $printer->getName(),
+        ));
+
+        return $this->redirectToReportDate($reportDate);
     }
 
     #[Route('/reports/production/pdf', name: 'production_report_pdf', methods: ['GET'])]
@@ -64,13 +110,15 @@ final class ProductionReportController extends AbstractController
         return $response;
     }
 
-    private function parseReportDate(Request $request, BakeryClock $bakeryClock): \DateTimeImmutable
+    /** @param InputBag<string|int|float|bool|null>|null $parameters */
+    private function parseReportDate(Request $request, BakeryClock $bakeryClock, ?InputBag $parameters = null): \DateTimeImmutable
     {
-        if (!$request->query->has('date')) {
+        $parameters ??= $request->query;
+        if (!$parameters->has('date')) {
             return $bakeryClock->today();
         }
 
-        $value = trim((string) $request->query->get('date'));
+        $value = trim((string) $parameters->get('date'));
         $timezone = new \DateTimeZone($bakeryClock->getTimezoneName());
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, $timezone);
         $errors = \DateTimeImmutable::getLastErrors();
@@ -79,5 +127,10 @@ final class ProductionReportController extends AbstractController
         }
 
         return $date;
+    }
+
+    private function redirectToReportDate(\DateTimeImmutable $reportDate): Response
+    {
+        return $this->redirectToRoute('production_report', ['date' => $reportDate->format('Y-m-d')]);
     }
 }

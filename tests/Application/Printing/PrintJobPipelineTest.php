@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Application\Printing;
 
+use App\Application\Document\ConfigurableDocumentRendererInterface;
 use App\Application\Document\DocumentRendererInterface;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
@@ -17,6 +18,8 @@ use App\Application\Printing\PrinterSubmissionException;
 use App\Application\Printing\PrintJobState;
 use App\Application\Printing\PrintJobStatusSnapshot;
 use App\Application\Printing\PrintSubmission;
+use App\Application\Printing\ProductionReportPrintDocumentGenerator;
+use App\Application\Production\ProductionReportPdfRenderer;
 use App\Entity\Customer;
 use App\Entity\Order;
 use App\Entity\OrderItem;
@@ -262,6 +265,151 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->createStub(MessageBusInterface::class),
             $this->createStub(LoggerInterface::class),
         ))(new ProcessPrintJob($printJob->getId()));
+    }
+
+    public function testReportHandlerUsesSharedReportRendererAndReportSubmission(): void
+    {
+        $printer = (new Printer())
+            ->setName('Configured report printer')
+            ->setAddress('ipp://printer.example/reports')
+            ->setForReports(true);
+        $this->entityManager->persist($printer);
+        $order = $this->createOrder();
+        $reportDate = new \DateTimeImmutable('2026-10-10', new \DateTimeZone('America/Indiana/Indianapolis'));
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::REPORT)
+            ->setStatus(PrintJobStatus::QUEUED)
+            ->setReportDate($reportDate);
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+
+        $documentRenderer = $this->createMock(ConfigurableDocumentRendererInterface::class);
+        $documentRenderer
+            ->expects(self::once())
+            ->method('renderHtmlToPdfWithOptions')
+            ->with(
+                self::callback(static fn (string $html): bool => str_contains($html, 'TOTAL TO MAKE: 2 EACH') && str_contains($html, 'Snapshot Customer')),
+                '8.5in',
+                '11in',
+                self::matchesRegularExpression('/^production-2026-10-10-print-job-\d+$/'),
+            )
+            ->willReturn('%PDF-1.7 production report');
+        $storage = $this->createMock(FilesystemOperator::class);
+        $storage
+            ->expects(self::once())
+            ->method('write')
+            ->with(
+                self::anything(),
+                '%PDF-1.7 production report',
+            );
+        $reportGenerator = new ProductionReportPrintDocumentGenerator(
+            self::getContainer()->get(\App\Application\Production\ProductionReportBuilder::class),
+            new ProductionReportPdfRenderer(
+                self::getContainer()->get(Environment::class),
+                $documentRenderer,
+                $storage,
+                $this->createStub(LoggerInterface::class),
+                self::getContainer()->get(BakeryClock::class),
+            ),
+        );
+
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient
+            ->expects(self::once())
+            ->method('submitPdf')
+            ->with(
+                $printer,
+                self::anything(),
+                'BakeDesk Production Report 2026-10-10',
+                PrintDocumentType::REPORT,
+            )
+            ->willReturn(new PrintSubmission('43', new PrintJobStatusSnapshot(PrintJobState::PENDING)));
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus
+            ->expects(self::once())
+            ->method('dispatch')
+            ->with(self::callback(static fn (object $message): bool => $message instanceof RefreshPrintJobStatus))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
+        (new ProcessPrintJobHandler(
+            $this->entityManager,
+            $this->printJobRepository,
+            self::getContainer()->get(OrderLabelRenderer::class),
+            self::getContainer()->get(BakeryClock::class),
+            $printerClient,
+            new IppJobStateMapper(),
+            $messageBus,
+            $this->createStub(LoggerInterface::class),
+            $reportGenerator,
+        ))(new ProcessPrintJob($printJob->getId()));
+
+        $this->entityManager->clear();
+        $stored = $this->printJobRepository->find($printJob->getId());
+        self::assertInstanceOf(PrintJob::class, $stored);
+        self::assertSame(PrintJobStatus::SUBMITTED, $stored->getStatus());
+        self::assertSame('43', $stored->getExternalJobId());
+        self::assertSame(1, $stored->getAttemptCount());
+        self::assertSame(
+            sprintf('reports/production/2026/10/production-2026-10-10-print-job-%d.pdf', $printJob->getId()),
+            $stored->getDocumentPath(),
+        );
+    }
+
+    public function testReportRenderingFailureMarksJobFailedWithoutSubmittingToPrinter(): void
+    {
+        $printer = (new Printer())
+            ->setName('Configured report printer')
+            ->setAddress('ipp://printer.example/reports')
+            ->setForReports(true);
+        $this->entityManager->persist($printer);
+        $this->createOrder();
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::REPORT)
+            ->setStatus(PrintJobStatus::QUEUED)
+            ->setReportDate(new \DateTimeImmutable('2026-10-10', new \DateTimeZone('America/Indiana/Indianapolis')));
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+
+        $documentRenderer = $this->createMock(ConfigurableDocumentRendererInterface::class);
+        $documentRenderer
+            ->expects(self::once())
+            ->method('renderHtmlToPdfWithOptions')
+            ->willThrowException(new \RuntimeException('Gotenberg unavailable'));
+        $reportGenerator = new ProductionReportPrintDocumentGenerator(
+            self::getContainer()->get(\App\Application\Production\ProductionReportBuilder::class),
+            new ProductionReportPdfRenderer(
+                self::getContainer()->get(Environment::class),
+                $documentRenderer,
+                $this->createStub(FilesystemOperator::class),
+                $this->createStub(LoggerInterface::class),
+                self::getContainer()->get(BakeryClock::class),
+            ),
+        );
+        $printerClient = $this->createMock(PrinterClientInterface::class);
+        $printerClient->expects(self::never())->method('submitPdf');
+
+        $this->expectException(\Throwable::class);
+        try {
+            (new ProcessPrintJobHandler(
+                $this->entityManager,
+                $this->printJobRepository,
+                self::getContainer()->get(OrderLabelRenderer::class),
+                self::getContainer()->get(BakeryClock::class),
+                $printerClient,
+                new IppJobStateMapper(),
+                $this->createStub(MessageBusInterface::class),
+                $this->createStub(LoggerInterface::class),
+                $reportGenerator,
+            ))(new ProcessPrintJob($printJob->getId()));
+        } finally {
+            $this->entityManager->clear();
+            $stored = $this->printJobRepository->find($printJob->getId());
+            self::assertInstanceOf(PrintJob::class, $stored);
+            self::assertSame(PrintJobStatus::FAILED, $stored->getStatus());
+            self::assertNull($stored->getDocumentPath());
+        }
     }
 
     public function testCreatorCreatesOneLabelForEveryPackageAcrossOrderItems(): void
