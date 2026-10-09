@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Application\Order\BakeryClock;
+use App\Application\Order\OrderCanceller;
+use App\Application\Order\OrderCompleter;
+use App\Application\Order\OrderReopener;
+use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use App\Model\OrderStatus;
+use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
@@ -36,6 +42,11 @@ final class OrderCrudController extends AbstractCrudController
         #[Autowire('%bakedesk_brand_name%')]
         private readonly string $bakedeskBrandName,
         private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly BakeryClock $bakeryClock,
+        private readonly OrderCompleter $orderCompleter,
+        private readonly OrderReopener $orderReopener,
+        private readonly OrderCanceller $orderCanceller,
+        private readonly OrderRealtimePublisher $realtimePublisher,
     ) {
     }
 
@@ -97,7 +108,7 @@ final class OrderCrudController extends AbstractCrudController
             ->setFormat(DateTimeField::FORMAT_MEDIUM, DateTimeField::FORMAT_SHORT)
             ->hideOnForm()
         ;
-        yield BooleanField::new('paid', 'Paid')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
+        yield BooleanField::new('paid', 'Paid')->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true);
         yield ChoiceField::new('status', 'Status')
             ->setChoices([
                 'Open' => OrderStatus::OPEN,
@@ -131,5 +142,80 @@ final class OrderCrudController extends AbstractCrudController
             ->hideOnIndex()
             ->hideOnForm()
         ;
+    }
+
+    public function updateEntity(EntityManagerInterface $entityManager, object $entityInstance): void
+    {
+        $originalData = $entityManager->getUnitOfWork()->getOriginalEntityData($entityInstance);
+        $originalStatus = $this->getOriginalStatus($originalData);
+        $submittedStatus = $entityInstance->getStatus();
+
+        if ($submittedStatus !== $originalStatus) {
+            // EasyAdmin has already mapped the submitted status. Restore the persisted
+            // status long enough for the lifecycle service to validate its precondition.
+            $entityInstance->setStatus($originalStatus);
+
+            try {
+                match ($submittedStatus) {
+                    OrderStatus::COMPLETED => $this->orderCompleter->complete($entityInstance),
+                    OrderStatus::OPEN => $this->orderReopener->reopen($entityInstance),
+                    OrderStatus::CANCELLED => $this->orderCanceller->cancel($entityInstance),
+                };
+            } catch (\LogicException $exception) {
+                $this->restoreOriginalEditableFields($entityInstance, $originalData, $originalStatus);
+                $this->addFlash('danger', sprintf(
+                    'Order status change rejected: %s',
+                    $exception->getMessage(),
+                ));
+            }
+
+            return;
+        }
+
+        $wasPaid = (bool) ($originalData['paid'] ?? false);
+        $entityInstance->setUpdatedAt($this->bakeryClock->now());
+
+        $entityManager->wrapInTransaction(function () use ($entityManager, $entityInstance): void {
+            $entityManager->persist($entityInstance);
+        });
+
+        if ($wasPaid !== $entityInstance->isPaid()) {
+            $this->realtimePublisher->publishOrderUpdated($entityInstance);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $originalData
+     */
+    private function getOriginalStatus(array $originalData): OrderStatus
+    {
+        $status = $originalData['status'] ?? null;
+
+        if ($status instanceof OrderStatus) {
+            return $status;
+        }
+
+        if (is_string($status)) {
+            return OrderStatus::from($status);
+        }
+
+        throw new \LogicException('The persisted Order status could not be determined.');
+    }
+
+    /**
+     * @param array<string, mixed> $originalData
+     */
+    private function restoreOriginalEditableFields(Order $order, array $originalData, OrderStatus $originalStatus): void
+    {
+        $pickupAt = $originalData['pickupAt'] ?? null;
+        if ($pickupAt instanceof \DateTimeImmutable) {
+            $order->setPickupAt($pickupAt);
+        }
+
+        $order
+            ->setPaid((bool) ($originalData['paid'] ?? false))
+            ->setStatus($originalStatus)
+            ->setNotes($originalData['notes'] ?? null)
+            ->setUpdatedAt($originalData['updatedAt'] ?? null);
     }
 }

@@ -65,7 +65,8 @@ final class AdminControllerTest extends WebTestCase
 
         $this->client->request('GET', '/order/new');
         self::assertResponseIsSuccessful();
-        self::assertSelectorNotExists('a[href="/admin"]');
+        self::assertSelectorExists('a[href="/admin"]');
+        self::assertSelectorTextContains('a[href="/admin"]', 'Admin');
         self::assertSelectorExists('img.navbar-brand-logo');
         self::assertStringContainsString('HRBakeryLogo', (string) $this->client->getResponse()->getContent());
     }
@@ -134,7 +135,7 @@ final class AdminControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
-    public function testOrderCrudIsHistoryOnlyAndLinksToOperationalDetail(): void
+    public function testOrderCrudAllowsPartialEditingAndLinksToOperationalDetail(): void
     {
         $customer = (new Customer())
             ->setName('Order History Customer')
@@ -168,7 +169,7 @@ final class AdminControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Order History Customer');
         self::assertStringContainsString('/orders/'.$order->getId(), (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('Create new', (string) $this->client->getResponse()->getContent());
-        self::assertStringNotContainsString('Edit', (string) $this->client->getResponse()->getContent());
+        self::assertStringContainsString('Edit', (string) $this->client->getResponse()->getContent());
         self::assertStringNotContainsString('Delete', (string) $this->client->getResponse()->getContent());
 
         $this->client->request('GET', '/admin/order/new');
@@ -179,7 +180,17 @@ final class AdminControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'History note');
         self::assertSelectorTextContains('body', 'Glazed');
-        self::assertStringNotContainsString('Edit', (string) $this->client->getResponse()->getContent());
+        self::assertStringContainsString('Edit', (string) $this->client->getResponse()->getContent());
+
+        $this->client->request('GET', '/admin/order/'.$order->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('input[name="Order[paid]"]');
+        self::assertSelectorExists('select[name="Order[status]"]');
+        self::assertSelectorExists('textarea[name="Order[notes]"]');
+        self::assertSelectorExists('input[name^="Order[pickupAt]"]');
+        foreach (['customer', 'customerName', 'customerPhone', 'user', 'orderNumber', 'orderedAt', 'items'] as $field) {
+            self::assertSelectorNotExists('[name^="Order['.$field.']"]');
+        }
     }
 
     public function testPrintJobCanBeCancelledBeforeSubmissionAndCannotAfterSubmission(): void

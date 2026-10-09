@@ -40,9 +40,14 @@ The `/admin` area must require authentication.
 EasyAdmin is used only for secured administrator-managed reference and configuration data.
 The normal bakery operational UI remains purpose-built and unauthenticated for V1.
 PackagingRules and Printers are managed through the administration area.
-The main operational navbar may link to the EasyAdmin dashboard only for visitors
-with `ROLE_ADMIN`. EasyAdmin Order management is for inspection and history;
-operational order creation and editing remain in the purpose-built BakeDesk UI.
+The main operational navbar always displays a link to the EasyAdmin dashboard.
+Symfony security protects `/admin` and redirects unauthenticated visitors to
+login. EasyAdmin Order management permits partial editing of pickupAt, paid,
+status, and notes while operational order creation and editing remain in the
+purpose-built BakeDesk UI. EasyAdmin Order status changes must use the same
+lifecycle services and realtime publication behavior as operational actions.
+Cancelled Orders remain terminal, and successful EasyAdmin Order modifications
+update `updatedAt` using the bakery clock.
 Orders must not be deleted.
 
 ---
