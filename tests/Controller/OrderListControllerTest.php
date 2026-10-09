@@ -175,9 +175,29 @@ final class OrderListControllerTest extends WebTestCase
         self::assertSelectorTextContains('body', 'Open');
         self::assertSelectorExists(sprintf('[data-role="paid-status"][data-order-id="%d"]', $order->getId()));
         self::assertSelectorExists(sprintf('[data-role="order-status"][data-order-id="%d"]', $order->getId()));
+        self::assertSame('', $this->client->getCrawler()->filter('[data-role="mark-paid-action"]')->attr('hidden'));
+        self::assertSelectorTextContains('[data-role="mark-not-paid-action"]', 'Mark Not Paid');
         self::assertSelectorTextContains('body', 'Call when ready');
         self::assertSelectorTextContains('body', 'Glazed');
         self::assertSelectorTextContains('body', 'Chocolate');
+    }
+
+    public function testDetailPaymentActionsReflectUnpaidAndCancelledState(): void
+    {
+        $order = $this->createOrder('4002', $this->bakeryClock->today()->modify('+1 day')->setTime(11, 30), 'Unpaid Customer');
+
+        $this->client->request('GET', '/orders/'.$order->getId());
+
+        self::assertSelectorTextContains('[data-role="paid-status"]', 'Not Paid');
+        self::assertSelectorTextContains('[data-role="mark-paid-action"]', 'Mark Paid');
+        self::assertSame('', $this->client->getCrawler()->filter('[data-role="mark-not-paid-action"]')->attr('hidden'));
+
+        $order->setStatus(OrderStatus::CANCELLED);
+        $this->entityManager->flush();
+        $this->client->request('GET', '/orders/'.$order->getId());
+
+        self::assertSelectorTextContains('[data-role="paid-status"]', 'Not Paid');
+        self::assertSelectorNotExists('[data-role="payment-actions"]');
     }
 
     public function testEmptyStatesDistinguishUpcomingAndSearchResults(): void

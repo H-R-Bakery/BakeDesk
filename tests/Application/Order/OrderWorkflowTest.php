@@ -6,6 +6,7 @@ namespace App\Tests\Application\Order;
 
 use App\Application\Order\BakeryClock;
 use App\Application\Order\OrderCompleter;
+use App\Application\Order\OrderPaymentUpdater;
 use App\Application\Order\OrderReopener;
 use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
@@ -18,6 +19,79 @@ use Symfony\Component\Mercure\HubInterface;
 
 final class OrderWorkflowTest extends TestCase
 {
+    #[DataProvider('paymentTransitionProvider')]
+    public function testPaymentUpdaterChangesEligibleOrdersAndPublishes(OrderStatus $status, bool $paid, bool $targetPaid): void
+    {
+        $order = (new Order())->setStatus($status)->setPaid($paid);
+        $this->setId($order, 123);
+        $oldUpdatedAt = $order->getUpdatedAt();
+        $publisher = $this->publisher(1);
+        $updater = new OrderPaymentUpdater($this->transactionalEntityManager(), $this->clock(), $publisher);
+
+        $changed = $targetPaid ? $updater->markPaid($order) : $updater->markNotPaid($order);
+
+        self::assertTrue($changed);
+        self::assertSame($targetPaid, $order->isPaid());
+        self::assertSame($status, $order->getStatus());
+        self::assertNotSame($oldUpdatedAt, $order->getUpdatedAt());
+    }
+
+    /**
+     * @return iterable<string, array{OrderStatus, bool, bool}>
+     */
+    public static function paymentTransitionProvider(): iterable
+    {
+        yield 'open to paid' => [OrderStatus::OPEN, false, true];
+        yield 'completed to paid' => [OrderStatus::COMPLETED, false, true];
+        yield 'open to not paid' => [OrderStatus::OPEN, true, false];
+        yield 'completed to not paid' => [OrderStatus::COMPLETED, true, false];
+    }
+
+    #[DataProvider('alreadySetPaymentProvider')]
+    public function testPaymentUpdaterTreatsAlreadySetPaymentAsANoOp(OrderStatus $status, bool $paid, bool $markPaid): void
+    {
+        $order = (new Order())->setStatus($status)->setPaid($paid);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('wrapInTransaction');
+
+        $changed = $markPaid
+            ? (new OrderPaymentUpdater($entityManager, $this->clock(), $this->publisher(0)))->markPaid($order)
+            : (new OrderPaymentUpdater($entityManager, $this->clock(), $this->publisher(0)))->markNotPaid($order);
+
+        self::assertFalse($changed);
+        self::assertSame($paid, $order->isPaid());
+    }
+
+    /**
+     * @return iterable<string, array{OrderStatus, bool, bool}>
+     */
+    public static function alreadySetPaymentProvider(): iterable
+    {
+        yield 'already paid and mark paid' => [OrderStatus::OPEN, true, true];
+        yield 'already not paid and mark not paid' => [OrderStatus::COMPLETED, false, false];
+    }
+
+    #[DataProvider('invalidPaymentStatusProvider')]
+    public function testPaymentUpdaterRejectsCancelledOrders(OrderStatus $status, bool $paid, bool $markPaid): void
+    {
+        $order = (new Order())->setStatus($status)->setPaid($paid);
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::never())->method('wrapInTransaction');
+
+        $this->expectException(\LogicException::class);
+        $updater = new OrderPaymentUpdater($entityManager, $this->clock(), $this->publisher(0));
+        $markPaid ? $updater->markPaid($order) : $updater->markNotPaid($order);
+    }
+
+    /**
+     * @return iterable<string, array{OrderStatus, bool, bool}>
+     */
+    public static function invalidPaymentStatusProvider(): iterable
+    {
+        yield 'cancelled unpaid mark paid' => [OrderStatus::CANCELLED, false, true];
+        yield 'cancelled paid mark not paid' => [OrderStatus::CANCELLED, true, false];
+    }
+
     public function testCompleterChangesAnOpenOrderAndPublishesAfterPersistence(): void
     {
         $order = (new Order())->setStatus(OrderStatus::OPEN)->setPaid(false);

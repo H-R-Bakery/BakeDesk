@@ -64,12 +64,25 @@ export default class MercureStatusController extends Controller {
                 element.textContent = payload.paid ? 'Paid' : 'Not Paid';
                 this.setBadgeClass(element, payload.paid ? 'success' : 'secondary');
             });
+            this.findOrderElements(payload.orderId, 'payment-actions').forEach((element) => {
+                const markPaidAction = element.querySelector('[data-role="mark-paid-action"]');
+                const markNotPaidAction = element.querySelector('[data-role="mark-not-paid-action"]');
+                if (markPaidAction) {
+                    markPaidAction.hidden = payload.paid;
+                }
+                if (markNotPaidAction) {
+                    markNotPaidAction.hidden = !payload.paid;
+                }
+            });
         }
 
         if (typeof payload.status === 'string' && orderStatusLabels[payload.status]) {
             this.findOrderElements(payload.orderId, 'order-status').forEach((element) => {
                 element.textContent = orderStatusLabels[payload.status];
                 this.setBadgeClass(element, payload.status === 'open' ? 'primary' : (payload.status === 'completed' ? 'success' : 'danger'));
+            });
+            this.findOrderElements(payload.orderId, 'payment-actions').forEach((element) => {
+                element.hidden = payload.status === 'cancelled';
             });
         }
     }

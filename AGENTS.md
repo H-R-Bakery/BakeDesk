@@ -210,6 +210,11 @@ orders may transition from `COMPLETED` back to `OPEN`. `CANCELLED` is terminal
 for V1. Paid state and order lifecycle status are independent; completing an
 unpaid order does not change its payment state.
 
+Operational payment actions may change `paid` for `OPEN` and `COMPLETED` Orders.
+`CANCELLED` Orders do not expose operational payment changes. Payment changes
+update `updatedAt` and publish the existing realtime Order update, but do not
+change lifecycle status.
+
 Cancelled orders must be retained.
 
 Do not delete an order merely because it was cancelled.
@@ -231,6 +236,11 @@ Do not add:
 - payment integrations
 
 The only payment-related field in V1 is a simple boolean indicating whether the order has been paid.
+
+The Order detail page provides compact POST actions for marking eligible Orders
+Paid or Not Paid. The Orders list does not expose direct payment mutation
+controls. Payment changes do not automatically reprint labels or regenerate
+reports; correcting a printed Paid/Not Paid label requires an explicit Reprint.
 
 Future Toast integration may change this, but it is outside the initial implementation.
 
@@ -460,6 +470,9 @@ otherwise it starts queued so the document is rendered again.
 
 CANCELLED Orders cannot produce new labels. All print, reprint, and retry
 actions are asynchronous and use POST routes protected by scoped CSRF tokens.
+
+Changing payment status does not create PrintJobs, reprint labels, change
+package allocation, or regenerate reports.
 
 Never put Doctrine entities directly into Messenger messages.
 

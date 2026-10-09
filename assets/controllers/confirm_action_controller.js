@@ -4,6 +4,9 @@ import Swal from 'sweetalert2';
 export default class extends Controller {
     static values = {
         message: String,
+        title: String,
+        confirmButtonText: String,
+        cancelButtonText: String,
     };
 
     async submit(event) {
@@ -14,12 +17,12 @@ export default class extends Controller {
         event.preventDefault();
 
         const result = await Swal.fire({
-            title: 'Complete unpaid order?',
+            title: this.hasTitleValue ? this.titleValue : 'Complete unpaid order?',
             text: this.messageValue,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Mark completed',
-            cancelButtonText: 'Go back',
+            confirmButtonText: this.hasConfirmButtonTextValue ? this.confirmButtonTextValue : 'Mark completed',
+            cancelButtonText: this.hasCancelButtonTextValue ? this.cancelButtonTextValue : 'Go back',
             focusCancel: true,
         });
 

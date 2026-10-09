@@ -587,6 +587,123 @@ final class OrderControllerTest extends WebTestCase
         self::assertNull($form->attr('data-confirm-action-message-value'));
     }
 
+    public function testOpenPaymentActionsUpdatePaymentWithoutChangingStatusOrCreatingPrintJobs(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $order = $this->createOrder('3016', $user, $productType, $unit, $this->createCustomer('Payment Action Customer', '+18125550112'));
+        $printer = $this->createDefaultLabelPrinter('Payment test printer');
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::QUEUED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($printJob);
+        $this->entityManager->flush();
+        $oldUpdatedAt = $order->getUpdatedAt()?->format('c');
+
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::exactly(2))->method('publish')->willReturn('update-id');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $paidToken = $crawler->filter('[data-role="mark-paid-action"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-paid', ['_token' => $paidToken]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $paidOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $paidOrder);
+        self::assertTrue($paidOrder->isPaid());
+        self::assertSame(OrderStatus::OPEN, $paidOrder->getStatus());
+        self::assertNotSame($oldUpdatedAt, $paidOrder->getUpdatedAt()?->format('c'));
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertCount(0, self::getContainer()->get('messenger.transport.print')->getSent());
+
+        $crawler = $this->client->followRedirect();
+        $notPaidToken = $crawler->filter('[data-role="mark-not-paid-action"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-not-paid', ['_token' => $notPaidToken]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $unpaidOrder = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $unpaidOrder);
+        self::assertFalse($unpaidOrder->isPaid());
+        self::assertSame(OrderStatus::OPEN, $unpaidOrder->getStatus());
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+    }
+
+    public function testCompletedOrderCanBeMarkedPaid(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $order = $this->createOrder('3017', $user, $productType, $unit, $this->createCustomer('Completed Payment Customer', '+18125550113'), OrderStatus::COMPLETED);
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::once())->method('publish')->willReturn('update-id');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $token = $crawler->filter('[data-role="mark-paid-action"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-paid', ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->entityManager->clear();
+        $saved = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $saved);
+        self::assertTrue($saved->isPaid());
+        self::assertSame(OrderStatus::COMPLETED, $saved->getStatus());
+    }
+
+    public function testPaymentActionsRejectInvalidCsrfCancelledOrdersAndNoOpRequestsWithoutPublishing(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $order = $this->createOrder('3018', $user, $productType, $unit, $this->createCustomer('CSRF Payment Customer', '+18125550114'));
+        $order->setPaid(true);
+        $this->entityManager->flush();
+        $oldUpdatedAt = $order->getUpdatedAt()?->format('c');
+        $hub = $this->createMock(HubInterface::class);
+        $hub->expects(self::never())->method('publish');
+        self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-paid');
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-not-paid', ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $token = $crawler->filter('[data-role="mark-paid-action"] input[name="_token"]')->attr('value');
+        $notPaidToken = $crawler->filter('[data-role="mark-not-paid-action"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-paid', ['_token' => $token]);
+        self::assertResponseRedirects('/orders/'.$order->getId());
+
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE bakery_order SET status = ? WHERE id = ?',
+            [OrderStatus::CANCELLED->value, $order->getId()],
+        );
+        $this->entityManager->clear();
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-paid', ['_token' => $token]);
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->client->request('POST', '/orders/'.$order->getId().'/mark-not-paid', ['_token' => $notPaidToken]);
+        self::assertResponseRedirects('/orders/'.$order->getId());
+
+        $this->entityManager->clear();
+        $saved = $this->entityManager->getRepository(Order::class)->find($order->getId());
+        self::assertInstanceOf(Order::class, $saved);
+        self::assertTrue($saved->isPaid());
+        self::assertSame(OrderStatus::CANCELLED, $saved->getStatus());
+        self::assertSame($oldUpdatedAt, $saved->getUpdatedAt()?->format('c'));
+    }
+
     public function testInvalidOrderWorkflowTransitionsAreRejectedWithoutStateChanges(): void
     {
         [$user] = $this->createUsers();

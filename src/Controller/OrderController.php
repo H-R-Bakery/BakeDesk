@@ -11,6 +11,7 @@ use App\Application\Order\NewOrderInputFactory;
 use App\Application\Order\OrderCanceller;
 use App\Application\Order\OrderCompleter;
 use App\Application\Order\OrderFormDataFactory;
+use App\Application\Order\OrderPaymentUpdater;
 use App\Application\Order\OrderReopener;
 use App\Application\Order\OrderSearchCriteria;
 use App\Application\Order\OrderUpdater;
@@ -396,6 +397,18 @@ final class OrderController extends AbstractController
         ]);
     }
 
+    #[Route('/orders/{id<\d+>}/mark-paid', name: 'order_mark_paid', methods: ['POST'])]
+    public function markPaid(int $id, Request $request, OrderRepository $orderRepository, OrderPaymentUpdater $orderPaymentUpdater): Response
+    {
+        return $this->updatePaymentStatus($id, $request, $orderRepository, $orderPaymentUpdater, true);
+    }
+
+    #[Route('/orders/{id<\d+>}/mark-not-paid', name: 'order_mark_not_paid', methods: ['POST'])]
+    public function markNotPaid(int $id, Request $request, OrderRepository $orderRepository, OrderPaymentUpdater $orderPaymentUpdater): Response
+    {
+        return $this->updatePaymentStatus($id, $request, $orderRepository, $orderPaymentUpdater, false);
+    }
+
     #[Route('/orders/{id<\d+>}/cancel', name: 'order_cancel', methods: ['POST'])]
     public function cancel(int $id, Request $request, OrderRepository $orderRepository, OrderCanceller $orderCanceller): Response
     {
@@ -487,6 +500,35 @@ final class OrderController extends AbstractController
         }
 
         return $date->setTimezone(new \DateTimeZone('UTC'));
+    }
+
+    private function updatePaymentStatus(int $id, Request $request, OrderRepository $orderRepository, OrderPaymentUpdater $orderPaymentUpdater, bool $paid): Response
+    {
+        $order = $orderRepository->find($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+
+        $tokenId = sprintf('mark-order-%s-%d', $paid ? 'paid' : 'not-paid', $id);
+        if (!$this->isCsrfTokenValid($tokenId, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+
+        try {
+            $changed = $paid
+                ? $orderPaymentUpdater->markPaid($order)
+                : $orderPaymentUpdater->markNotPaid($order);
+            $this->addFlash(
+                $changed ? 'success' : 'warning',
+                $changed
+                    ? sprintf('Order #%s marked %s.', $order->getOrderNumber(), $paid ? 'paid' : 'not paid')
+                    : sprintf('Order #%s is already marked %s.', $order->getOrderNumber(), $paid ? 'paid' : 'not paid'),
+            );
+        } catch (\LogicException $exception) {
+            $this->addFlash('warning', sprintf('Order #%s could not have its payment status changed: %s', $order->getOrderNumber(), $exception->getMessage()));
+        }
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
     }
 
     private function canPrintLabels(Order $order): bool

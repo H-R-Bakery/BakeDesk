@@ -50,10 +50,11 @@ final class ProductionReportControllerTest extends WebTestCase
     {
         $date = new \DateTimeImmutable('2026-10-09', new \DateTimeZone($this->bakeryClock->getTimezoneName()));
         $customer = $this->createCustomer('Snapshot Customer', '+18125550001');
-        $this->createOrder('1001', $date->setTime(8, 0), $customer, [
+        $paidOpen = $this->createOrder('1001', $date->setTime(8, 0), $customer, [
             [$this->donuts, '1', $this->dozen, 'Glazed'],
             [$this->cookies, '2', $this->each, 'Chocolate Chip'],
         ]);
+        $paidOpen->setPaid(true);
         $this->createOrder('1004', $date->setTime(9, 30), $this->createCustomer('Completed Customer', '+18125550002'), [
             [$this->donuts, '14', $this->each, 'Assorted'],
             [$this->cookies, '1', $this->tray, 'Sugar'],

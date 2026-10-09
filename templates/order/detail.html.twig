@@ -43,7 +43,21 @@
                 <dt class="col-sm-3">Ordered at</dt>
                 <dd class="col-sm-9">{{ order.orderedAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
                 <dt class="col-sm-3">Payment</dt>
-                <dd class="col-sm-9"><span data-order-id="{{ order.id }}" data-role="paid-status" class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></dd>
+                <dd class="col-sm-9 d-flex flex-wrap align-items-center gap-2">
+                    <span data-order-id="{{ order.id }}" data-role="paid-status" class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span>
+                    {% if order.status.value in ['open', 'completed'] %}
+                        <span data-order-id="{{ order.id }}" data-role="payment-actions" class="d-inline-flex gap-2">
+                            <form method="post" action="{{ path('order_mark_paid', {id: order.id}) }}" data-role="mark-paid-action"{% if order.paid %} hidden{% endif %}>
+                                <input type="hidden" name="_token" value="{{ csrf_token('mark-order-paid-' ~ order.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-success">Mark Paid</button>
+                            </form>
+                            <form method="post" action="{{ path('order_mark_not_paid', {id: order.id}) }}" data-role="mark-not-paid-action" data-controller="confirm-action" data-action="submit->confirm-action#submit" data-confirm-action-message-value="Mark Order #{{ order.orderNumber }} as not paid?" data-confirm-action-title-value="Mark order as not paid?" data-confirm-action-confirm-button-text-value="Mark not paid"{% if not order.paid %} hidden{% endif %}>
+                                <input type="hidden" name="_token" value="{{ csrf_token('mark-order-not-paid-' ~ order.id) }}">
+                                <button type="submit" class="btn btn-sm btn-outline-warning">Mark Not Paid</button>
+                            </form>
+                        </span>
+                    {% endif %}
+                </dd>
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9"><span data-order-id="{{ order.id }}" data-role="order-status" class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></dd>
                 {% if order.notes %}
