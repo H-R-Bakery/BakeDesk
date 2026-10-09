@@ -3,8 +3,63 @@
 {% block content_title %}{{ bakery_brand_name }} · {{ bakedesk_brand_name }} administration{% endblock %}
 
 {% block main %}
-    <div class="content-panel">
+    <div class="content-panel mb-4">
         <h1 class="content-title">{{ bakery_brand_name }} · {{ bakedesk_brand_name }} administration</h1>
-        <p class="text-body-secondary">Manage bakery reference data, packaging configuration, printers, and print history from the menu.</p>
+        <p class="text-body-secondary mb-0">A point-in-time view of bakery operations and configuration readiness.</p>
     </div>
+
+    <section aria-labelledby="operations-heading" class="mb-4">
+        <h2 class="h4 mb-3" id="operations-heading">Operations</h2>
+        <div class="row g-3">
+            {% for metric in dashboard.operationMetrics %}
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <a class="text-decoration-none" href="{{ metric.href }}">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h3 class="h6 card-title text-body-secondary">{{ metric.title }}</h3>
+                                <p class="display-5 fw-semibold text-{{ metric.tone }} mb-2">{{ metric.value }}</p>
+                                <p class="card-text small text-body-secondary mb-0">{{ metric.description }}</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section aria-labelledby="attention-heading" class="mb-4">
+        <h2 class="h4 mb-3" id="attention-heading">Attention Needed</h2>
+        {% set failed = dashboard.failedPrintJobs %}
+        <a class="text-decoration-none" href="{{ failed.href }}">
+            <div class="alert alert-{{ failed.tone }} d-flex align-items-center justify-content-between gap-3 mb-0" role="status">
+                <div>
+                    <h3 class="h5 mb-1">{{ failed.title }}</h3>
+                    <p class="mb-0">{{ failed.description }}</p>
+                </div>
+                <span class="display-6 fw-semibold">{{ failed.value }}</span>
+            </div>
+        </a>
+    </section>
+
+    <section aria-labelledby="readiness-heading">
+        <h2 class="h4 mb-3" id="readiness-heading">Configuration Readiness</h2>
+        <div class="row g-3">
+            {% for check in dashboard.readinessChecks %}
+                {% set alertClass = check.level == 'ok' ? 'success' : (check.level == 'warning' ? 'warning' : 'danger') %}
+                {% set icon = check.level == 'ok' ? '✓' : (check.level == 'warning' ? '⚠' : '✗') %}
+                <div class="col-12 col-md-6">
+                    <div class="alert alert-{{ alertClass }} h-100 mb-0">
+                        <div class="d-flex gap-3">
+                            <span class="fs-4" aria-hidden="true">{{ icon }}</span>
+                            <div>
+                                <h3 class="h6 mb-1">{{ check.title }}</h3>
+                                <p class="mb-2">{{ check.message }}</p>
+                                <a class="alert-link" href="{{ check.href }}">{{ check.actionLabel }}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
 {% endblock %}

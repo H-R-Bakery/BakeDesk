@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Application\Admin\AdminDashboardProvider;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
@@ -23,12 +24,15 @@ final class DashboardController extends AbstractDashboardController
         private readonly string $bakedeskBrandName,
         #[Autowire('%bakery_logo_asset%')]
         private readonly string $bakeryLogoAsset,
+        private readonly AdminDashboardProvider $dashboardProvider,
     ) {
     }
 
     public function index(): Response
     {
-        return $this->render('admin/dashboard.html.twig');
+        return $this->render('admin/dashboard.html.twig', [
+            'dashboard' => $this->dashboardProvider->build(),
+        ]);
     }
 
     public function configureDashboard(): Dashboard

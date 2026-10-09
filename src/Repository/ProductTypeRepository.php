@@ -19,4 +19,14 @@ class ProductTypeRepository extends AbstractServiceEntityRepository
     {
         return $this->findBy(['active' => true], ['sortOrder' => 'ASC', 'name' => 'ASC', 'id' => 'ASC']);
     }
+
+    public function countActive(): int
+    {
+        return (int) $this->createQueryBuilder('productType')
+            ->select('COUNT(productType.id)')
+            ->andWhere('productType.active = :active')
+            ->setParameter('active', true)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

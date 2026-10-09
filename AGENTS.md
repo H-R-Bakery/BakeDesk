@@ -629,6 +629,15 @@ EasyAdmin is intended for management of data such as:
 - printers
 - application configuration where appropriate
 
+The admin dashboard summarizes current operational state and configuration
+readiness. Dashboard checks query PostgreSQL configuration and application
+state only; they do not probe printer connectivity. Printer connectivity is
+checked only through explicit printer diagnostics. Missing PackagingRules are
+not configuration failures, and Unit production conversion correctness must
+not be inferred from Unit names. Dashboard order counts use bakery-local day
+boundaries converted consistently with UTC persistence. The dashboard is a
+point-in-time view and does not require a Mercure subscription.
+
 The administration area must be authenticated.
 
 The normal order-entry and production-report interfaces are public on the bakery LAN for V1.

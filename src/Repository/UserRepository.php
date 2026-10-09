@@ -20,6 +20,19 @@ class UserRepository extends AbstractServiceEntityRepository
     }
 
     /**
+     * This matches NewOrderType, which currently offers every active user.
+     */
+    public function countAvailableForOrderEntry(): int
+    {
+        return (int) $this->createQueryBuilder('user')
+            ->select('COUNT(user.id)')
+            ->andWhere('user.active = :active')
+            ->setParameter('active', true)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * @return list<User>
      */
     public function findAllOrdered(): array

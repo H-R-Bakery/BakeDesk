@@ -123,6 +123,46 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function countPickupBetween(\DateTimeImmutable $start, \DateTimeImmutable $end): int
+    {
+        return (int) $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.pickupAt >= :start')
+            ->andWhere('o.pickupAt < :end')
+            ->andWhere('o.status IN (:statuses)')
+            ->setParameter('start', $start, Types::DATETIME_IMMUTABLE)
+            ->setParameter('end', $end, Types::DATETIME_IMMUTABLE)
+            ->setParameter('statuses', [OrderStatus::OPEN->value, OrderStatus::COMPLETED->value])
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countUpcomingOpen(\DateTimeImmutable $from): int
+    {
+        return (int) $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.status = :status')
+            ->andWhere('o.pickupAt >= :from')
+            ->setParameter('status', OrderStatus::OPEN->value)
+            ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countUpcomingUnpaid(\DateTimeImmutable $from): int
+    {
+        return (int) $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.status = :status')
+            ->andWhere('o.paid = :paid')
+            ->andWhere('o.pickupAt >= :from')
+            ->setParameter('status', OrderStatus::OPEN->value)
+            ->setParameter('paid', false)
+            ->setParameter('from', $from, Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     /**
      * @return list<Order>
      */

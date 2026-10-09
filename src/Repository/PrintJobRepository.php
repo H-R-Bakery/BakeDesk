@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Order;
 use App\Entity\PrintJob;
 use App\Model\PrintDocumentType;
+use App\Model\PrintJobStatus;
 
 /** @extends AbstractServiceEntityRepository<PrintJob> */
 class PrintJobRepository extends AbstractServiceEntityRepository
@@ -26,6 +27,23 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @param list<PrintJobStatus> $statuses
+     */
+    public function countByStatuses(array $statuses): int
+    {
+        if ([] === $statuses) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('printJob')
+            ->select('COUNT(printJob.id)')
+            ->andWhere('printJob.status IN (:statuses)')
+            ->setParameter('statuses', array_map(static fn (PrintJobStatus $status): string => $status->value, $statuses))
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**
