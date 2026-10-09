@@ -13,8 +13,10 @@ use App\Application\Printing\IppJobStateMapper;
 use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrinterResolver;
 use App\Application\Printing\LabelPrintJobCreator;
+use App\Application\Printing\LabelPrintJobRetryService;
 use App\Application\Printing\PrinterClientInterface;
 use App\Application\Printing\PrinterSubmissionException;
+use App\Application\Printing\PrintJobRetryException;
 use App\Application\Printing\PrintJobState;
 use App\Application\Printing\PrintJobStatusSnapshot;
 use App\Application\Printing\PrintSubmission;
@@ -501,6 +503,136 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertSame([2, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $ruleJobs));
     }
 
+    public function testRetryWithRenderedDocumentCreatesNewRenderedJobAndPreservesFailedJob(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $orderItem = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $orderItem);
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setOrderItem($orderItem)
+            ->setPackageNumber(1)
+            ->setPackageCount(2)
+            ->setPackageQuantity('1')
+            ->setDocumentPath('labels/2026/10/failed-label.pdf')
+            ->setExternalJobId('old-ipp-job')
+            ->setErrorMessage('Printer rejected the document.');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::isInstanceOf(ProcessPrintJob::class))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $retry = (new LabelPrintJobRetryService($this->entityManager, $this->printJobRepository, $messageBus))->retry($failedJob);
+
+        self::assertNotSame($failedJob, $retry);
+        self::assertSame(PrintJobStatus::FAILED, $failedJob->getStatus());
+        self::assertSame('old-ipp-job', $failedJob->getExternalJobId());
+        self::assertSame(PrintJobStatus::RENDERED, $retry->getStatus());
+        self::assertSame($printer, $retry->getPrinter());
+        self::assertSame($failedJob->getOrder(), $retry->getOrder());
+        self::assertSame($failedJob->getOrderItem(), $retry->getOrderItem());
+        self::assertSame($failedJob->getPackageNumber(), $retry->getPackageNumber());
+        self::assertSame($failedJob->getPackageCount(), $retry->getPackageCount());
+        self::assertSame($failedJob->getPackageQuantity(), $retry->getPackageQuantity());
+        self::assertSame($failedJob->getDocumentPath(), $retry->getDocumentPath());
+        self::assertNull($retry->getExternalJobId());
+        self::assertSame(0, $retry->getAttemptCount());
+        self::assertNull($retry->getStartedAt());
+        self::assertNull($retry->getSubmittedAt());
+        self::assertNull($retry->getCompletedAt());
+        self::assertNull($retry->getErrorMessage());
+    }
+
+    public function testRetryWithoutRenderedDocumentCreatesNewQueuedJob(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setDocumentPath(null);
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::isInstanceOf(ProcessPrintJob::class))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+
+        $retry = (new LabelPrintJobRetryService($this->entityManager, $this->printJobRepository, $messageBus))->retry($failedJob);
+
+        self::assertSame(PrintJobStatus::QUEUED, $retry->getStatus());
+        self::assertNull($retry->getDocumentPath());
+        self::assertSame(PrintJobStatus::FAILED, $failedJob->getStatus());
+    }
+
+    public function testRetryRejectsNonFailedAndReportJobsWithoutCreatingJobs(): void
+    {
+        $printer = $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        foreach ([PrintJobStatus::COMPLETED, PrintJobStatus::SUBMITTED, PrintJobStatus::QUEUED, PrintJobStatus::PROCESSING, PrintJobStatus::RENDERED, PrintJobStatus::CANCELLED] as $status) {
+            $job = (new PrintJob())
+                ->setPrinter($printer)
+                ->setDocumentType(PrintDocumentType::LABEL)
+                ->setStatus($status)
+                ->setOrder($order);
+            $this->entityManager->persist($job);
+            $this->entityManager->flush();
+            try {
+                (new LabelPrintJobRetryService($this->entityManager, $this->printJobRepository, $this->createStub(MessageBusInterface::class)))->retry($job);
+                self::fail('A non-failed label job was accepted for retry.');
+            } catch (PrintJobRetryException) {
+                self::addToAssertionCount(1);
+            }
+        }
+
+        $reportJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::REPORT)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order);
+        $this->entityManager->persist($reportJob);
+        $this->entityManager->flush();
+        try {
+            (new LabelPrintJobRetryService($this->entityManager, $this->printJobRepository, $this->createStub(MessageBusInterface::class)))->retry($reportJob);
+            self::fail('A report job was accepted for label retry.');
+        } catch (PrintJobRetryException) {
+            self::addToAssertionCount(1);
+        }
+
+        self::assertSame(7, $this->entityManager->getRepository(PrintJob::class)->count([]));
+    }
+
+    public function testRetryRejectsInactiveOrNonLabelPrinter(): void
+    {
+        $printer = (new Printer())
+            ->setName('Unavailable printer')
+            ->setAddress('ipp://printer.example/unavailable')
+            ->setForLabels(true)
+            ->setActive(false);
+        $this->entityManager->persist($printer);
+        $order = $this->createOrder();
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order);
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+
+        $this->expectException(PrintJobRetryException::class);
+        (new LabelPrintJobRetryService($this->entityManager, $this->printJobRepository, $this->createStub(MessageBusInterface::class)))->retry($failedJob);
+    }
+
     public function testHandlerMarksRenderingFailureAndRethrowsForMessengerRetry(): void
     {
         $this->createDefaultPrinter();
@@ -672,9 +804,11 @@ final class PrintJobPipelineTest extends KernelTestCase
         $printerClient->expects(self::once())->method('submitPdf')->willThrowException(
             PrinterSubmissionException::outcomeUnknown(new \RuntimeException('connection closed')),
         );
+        $documentRenderer = $this->createMock(DocumentRendererInterface::class);
+        $documentRenderer->expects(self::never())->method('renderHtmlToPdf');
         $labelRenderer = new OrderLabelRenderer(
             self::getContainer()->get(Environment::class),
-            $this->createStub(DocumentRendererInterface::class),
+            $documentRenderer,
             $this->createStub(FilesystemOperator::class),
             self::getContainer()->get(BakeryClock::class),
             $this->createStub(LoggerInterface::class),

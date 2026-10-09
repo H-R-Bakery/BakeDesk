@@ -27,4 +27,20 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    /**
+     * @return list<PrintJob>
+     */
+    public function findLabelJobsForOrder(Order $order): array
+    {
+        return $this->createQueryBuilder('printJob')
+            ->andWhere('printJob.order = :order')
+            ->andWhere('printJob.documentType = :documentType')
+            ->setParameter('order', $order)
+            ->setParameter('documentType', PrintDocumentType::LABEL)
+            ->orderBy('printJob.createdAt', 'DESC')
+            ->addOrderBy('printJob.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
 }

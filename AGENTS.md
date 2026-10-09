@@ -100,7 +100,6 @@ Initial customer data includes at least:
 
 - name
 - phone number
-- normalized phone number
 - active state
 - created timestamp
 - updated timestamp
@@ -110,14 +109,14 @@ Customer name and phone number must autocomplete during order entry.
 Autocomplete should search both:
 
 - customer name
-- normalized phone number
+- phone number using the installed libphonenumber integration's canonical representation
 
 Order takers should never have to explicitly create a customer while taking an order.
 
 When an order is saved:
 
 1. Use the selected customer if one was chosen.
-2. Otherwise attempt to match an existing customer, primarily by normalized phone number.
+2. Otherwise attempt to match an existing customer, primarily by the canonical phone number representation provided by the installed libphonenumber integration.
 3. If no matching customer exists, automatically create one.
 4. Associate the order with that customer.
 
@@ -421,6 +420,17 @@ Expected flow:
 If a package allocation fails, the Order remains saved, no initial label jobs
 are created for that Order, and the queueing error identifies the ProductType
 and Unit when applicable.
+
+Reprinting creates a new LABEL `PrintJob` from the current Order and current
+package allocation. It uses the current default active label printer.
+Retrying creates a new LABEL `PrintJob` from a FAILED label job's historical
+context and uses that job's original printer. Historical PrintJobs are
+immutable workflow history and are never reset for staff retries. When a
+failed job has a stored rendered document, a retry reuses that document;
+otherwise it starts queued so the document is rendered again.
+
+CANCELLED Orders cannot produce new labels. All print, reprint, and retry
+actions are asynchronous and use POST routes protected by scoped CSRF tokens.
 
 Never put Doctrine entities directly into Messenger messages.
 

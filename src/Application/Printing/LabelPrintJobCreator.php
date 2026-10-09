@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Application\Printing;
 
 use App\Application\Packaging\OrderPackageCalculator;
+use App\Application\Packaging\PackageAllocation;
 use App\Entity\Order;
+use App\Entity\Printer;
 use App\Entity\PrintJob;
 use App\Message\ProcessPrintJob;
 use App\Model\PrintDocumentType;
@@ -33,6 +35,28 @@ final class LabelPrintJobCreator
         $printer = $this->labelPrinterResolver->resolve();
         $allocations = $this->orderPackageCalculator->calculate($order);
 
+        return $this->createAndDispatchForAllocations($order, $printer, $allocations);
+    }
+
+    public function createAllocationAndDispatch(Order $order, PackageAllocation $allocation): PrintJob
+    {
+        if ($allocation->orderItem->getOrder() !== $order) {
+            throw new \InvalidArgumentException('The package allocation does not belong to the order.');
+        }
+
+        $printer = $this->labelPrinterResolver->resolve();
+        $printJobs = $this->createAndDispatchForAllocations($order, $printer, [$allocation]);
+
+        return $printJobs[0] ?? throw new \LogicException('The label print job was not created.');
+    }
+
+    /**
+     * @param list<PackageAllocation> $allocations
+     *
+     * @return list<PrintJob>
+     */
+    private function createAndDispatchForAllocations(Order $order, Printer $printer, array $allocations): array
+    {
         /** @var list<PrintJob> $printJobs */
         $printJobs = $this->entityManager->wrapInTransaction(function () use ($order, $printer, $allocations): array {
             $printJobs = [];

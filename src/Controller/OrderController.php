@@ -17,6 +17,8 @@ use App\Application\Packaging\PackageAllocation;
 use App\Application\Packaging\PackagingException;
 use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrintJobCreator;
+use App\Application\Printing\LabelPrintJobRetryService;
+use App\Application\Printing\PrintJobRetryException;
 use App\Entity\Order;
 use App\Form\Model\NewOrderData;
 use App\Form\NewOrderType;
@@ -159,11 +161,123 @@ final class OrderController extends AbstractController
 
         return $this->render('order/detail.html.twig', [
             'order' => $order,
-            'label_print_job' => $printJobRepository->findLatestLabelForOrder($order),
+            'latest_label_jobs' => $this->latestLabelJobsByPackage($printJobRepository->findLabelJobsForOrder($order)),
             'package_allocations' => $packageAllocations,
             'packaging_error' => $packagingError,
             'bakery_timezone' => $bakeryClock->getTimezoneName(),
         ]);
+    }
+
+    #[Route('/orders/{id<\d+>}/labels/reprint', name: 'order_labels_reprint', methods: ['POST'])]
+    public function reprintAllLabels(
+        int $id,
+        Request $request,
+        OrderRepository $orderRepository,
+        LabelPrintJobCreator $labelPrintJobCreator,
+    ): Response {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (!$this->isCsrfTokenValid('reprint-all-labels-'.$id, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+        if (!$this->canPrintLabels($order)) {
+            return $this->redirectToRoute('order_detail', ['id' => $id]);
+        }
+
+        try {
+            $printJobs = $labelPrintJobCreator->createAndDispatch($order);
+            $this->addFlash('success', sprintf('%d label%s queued for reprint.', \count($printJobs), 1 === \count($printJobs) ? '' : 's'));
+        } catch (LabelPrinterConfigurationException|PackagingException $exception) {
+            $this->addFlash('warning', sprintf('Labels could not be queued for reprint: %s', $exception->getMessage()));
+        }
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
+    }
+
+    #[Route('/orders/{id<\d+>}/labels/{itemId<\d+>}/{packageNumber<\d+>}/reprint', name: 'order_label_package_reprint', methods: ['POST'])]
+    public function reprintPackageLabel(
+        int $id,
+        int $itemId,
+        int $packageNumber,
+        Request $request,
+        OrderRepository $orderRepository,
+        OrderPackageCalculator $orderPackageCalculator,
+        LabelPrintJobCreator $labelPrintJobCreator,
+    ): Response {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (!$this->isCsrfTokenValid(sprintf('reprint-package-label-%d-%d-%d', $id, $itemId, $packageNumber), (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+        if (!$this->canPrintLabels($order)) {
+            return $this->redirectToRoute('order_detail', ['id' => $id]);
+        }
+
+        $allocation = null;
+        try {
+            foreach ($orderPackageCalculator->calculate($order) as $candidate) {
+                if ($candidate->orderItem->getId() === $itemId && $candidate->packageNumber === $packageNumber) {
+                    $allocation = $candidate;
+                    break;
+                }
+            }
+        } catch (PackagingException $exception) {
+            $this->addFlash('warning', sprintf('The label could not be queued for reprint: %s', $exception->getMessage()));
+
+            return $this->redirectToRoute('order_detail', ['id' => $id]);
+        }
+
+        if (!$allocation instanceof PackageAllocation) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $labelPrintJobCreator->createAllocationAndDispatch($order, $allocation);
+            $this->addFlash('success', sprintf('Label for %s queued for reprint.', $this->allocationLabel($allocation)));
+        } catch (LabelPrinterConfigurationException $exception) {
+            $this->addFlash('warning', sprintf('The label could not be queued for reprint: %s', $exception->getMessage()));
+        }
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
+    }
+
+    #[Route('/orders/{id<\d+>}/print-jobs/{printJobId<\d+>}/retry', name: 'order_print_job_retry', methods: ['POST'])]
+    public function retryLabelPrintJob(
+        int $id,
+        int $printJobId,
+        Request $request,
+        OrderRepository $orderRepository,
+        PrintJobRepository $printJobRepository,
+        LabelPrintJobRetryService $retryService,
+    ): Response {
+        $order = $orderRepository->findForDetail($id);
+        if (!$order instanceof Order) {
+            throw $this->createNotFoundException();
+        }
+        if (!$this->isCsrfTokenValid('retry-print-job-'.$printJobId, (string) $request->request->get('_token'))) {
+            throw new AccessDeniedHttpException('Invalid CSRF token.');
+        }
+        if (!$this->canPrintLabels($order)) {
+            return $this->redirectToRoute('order_detail', ['id' => $id]);
+        }
+
+        $printJob = $printJobRepository->find($printJobId);
+        if (null === $printJob || $printJob->getOrder()?->getId() !== $order->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $retryService->retry($printJob);
+            $this->addFlash('success', sprintf('Failed print job #%d queued for retry.', $printJobId));
+        } catch (PrintJobRetryException $exception) {
+            $this->addFlash('warning', $exception->getMessage());
+        }
+
+        return $this->redirectToRoute('order_detail', ['id' => $id]);
     }
 
     #[Route('/orders/{id<\d+>}/label', name: 'order_label', methods: ['GET'])]
@@ -319,5 +433,50 @@ final class OrderController extends AbstractController
         }
 
         return $date->setTimezone(new \DateTimeZone('UTC'));
+    }
+
+    private function canPrintLabels(Order $order): bool
+    {
+        if (OrderStatus::CANCELLED === $order->getStatus()) {
+            $this->addFlash('warning', 'Cancelled orders cannot produce new labels.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<\App\Entity\PrintJob> $printJobs
+     *
+     * @return array<string, \App\Entity\PrintJob>
+     */
+    private function latestLabelJobsByPackage(array $printJobs): array
+    {
+        $latest = [];
+        foreach ($printJobs as $printJob) {
+            $orderItemId = $printJob->getOrderItem()?->getId();
+            $packageNumber = $printJob->getPackageNumber();
+            if (null === $orderItemId || null === $packageNumber) {
+                continue;
+            }
+
+            $key = $orderItemId.':'.$packageNumber;
+            if (!\array_key_exists($key, $latest)) {
+                $latest[$key] = $printJob;
+            }
+        }
+
+        return $latest;
+    }
+
+    private function allocationLabel(PackageAllocation $allocation): string
+    {
+        $label = sprintf('%s — %s %s', $allocation->orderItem->getProductType()?->getName() ?? 'Package', $allocation->quantity, $allocation->unit->getName());
+        if ($allocation->packageCount > 1) {
+            $label .= sprintf(' — Box %d of %d', $allocation->packageNumber, $allocation->packageCount);
+        }
+
+        return $label;
     }
 }

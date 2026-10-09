@@ -94,7 +94,7 @@ final class AppFixtures extends Fixture
 
         $manager->persist((new Printer())
             ->setName('Labeler')
-            ->setAddress('ipp://192.168.20.40/ipp/print')
+            ->setAddress('ipp://localhost:631/printers/JADENS_JD-668BT')
             ->setForLabels(true)
             ->setDefaultForLabels(true)
             ->setActive(true)

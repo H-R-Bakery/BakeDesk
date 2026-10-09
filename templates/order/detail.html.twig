@@ -36,15 +36,6 @@
                 <dd class="col-sm-9"><span class="badge text-bg-{{ order.paid ? 'success' : 'secondary' }}">{{ order.paid ? 'Paid' : 'Not Paid' }}</span></dd>
                 <dt class="col-sm-3">Status</dt>
                 <dd class="col-sm-9"><span class="badge text-bg-{{ order.status.value == 'open' ? 'primary' : (order.status.value == 'completed' ? 'success' : 'danger') }}">{{ status_labels[order.status.value] }}</span></dd>
-                {% if label_print_job %}
-                    <dt class="col-sm-3">Label printing</dt>
-                    <dd class="col-sm-9">
-                        <span class="badge text-bg-{{ label_print_job.status.value == 'failed' ? 'danger' : (label_print_job.status.value == 'completed' ? 'success' : 'secondary') }}">{{ print_status_labels[label_print_job.status.value] }}</span>
-                        {% if label_print_job.status.value == 'failed' and label_print_job.errorMessage %}
-                            <span class="text-body-secondary ms-2">{{ label_print_job.errorMessage }}</span>
-                        {% endif %}
-                    </dd>
-                {% endif %}
                 {% if order.notes %}
                     <dt class="col-sm-3">Notes</dt>
                     <dd class="col-sm-9">{{ order.notes }}</dd>
@@ -55,7 +46,15 @@
 
     <div class="card shadow-sm mb-4">
         <div class="card-body">
-            <h2 class="h5">Preview labels</h2>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h5 mb-0">Labels</h2>
+                {% if order.status.value in ['open', 'completed'] and package_allocations is not empty %}
+                    <form method="post" action="{{ path('order_labels_reprint', {id: order.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('reprint-all-labels-' ~ order.id) }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Reprint all labels</button>
+                    </form>
+                {% endif %}
+            </div>
             {% if packaging_error %}
                 <p class="alert alert-warning mb-0">{{ packaging_error }}</p>
             {% elseif package_allocations is empty %}
@@ -63,15 +62,42 @@
             {% else %}
                 <div class="list-group">
                     {% for allocation in package_allocations %}
-                        <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                            <span>
+                        {% set package_key = allocation.orderItem.id ~ ':' ~ allocation.packageNumber %}
+                        {% set print_job = latest_label_jobs[package_key] ?? null %}
+                        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-3">
+                            <div>
                                 <strong>{{ allocation.orderItem.productType.name }}</strong>
                                 — {{ allocation.quantity }} {{ allocation.unit.name }}
                                 {% if allocation.packageCount > 1 %}
                                     — Box {{ allocation.packageNumber }} of {{ allocation.packageCount }}
                                 {% endif %}
-                            </span>
-                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('order_label_package', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}" target="_blank" rel="noopener">Preview</a>
+                                <div class="mt-1">
+                                    {% if print_job %}
+                                        <span class="text-body-secondary">Status:</span>
+                                        <span class="badge text-bg-{{ print_job.status.value == 'failed' ? 'danger' : (print_job.status.value == 'completed' ? 'success' : 'secondary') }}">{{ print_status_labels[print_job.status.value] }}</span>
+                                        {% if print_job.status.value == 'failed' and print_job.errorMessage %}
+                                            <span class="text-body-secondary ms-2">{{ print_job.errorMessage }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-body-secondary">Status: Not queued</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('order_label_package', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}" target="_blank" rel="noopener">Preview</a>
+                                {% if order.status.value in ['open', 'completed'] %}
+                                    <form method="post" action="{{ path('order_label_package_reprint', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('reprint-package-label-' ~ order.id ~ '-' ~ allocation.orderItem.id ~ '-' ~ allocation.packageNumber) }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Reprint</button>
+                                    </form>
+                                    {% if print_job and print_job.documentType.value == 'label' and print_job.status.value == 'failed' %}
+                                        <form method="post" action="{{ path('order_print_job_retry', {id: order.id, printJobId: print_job.id}) }}">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('retry-print-job-' ~ print_job.id) }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Retry</button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
                         </div>
                     {% endfor %}
                 </div>

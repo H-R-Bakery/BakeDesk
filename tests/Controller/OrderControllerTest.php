@@ -506,6 +506,294 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(0, $this->entityManager->getRepository(PrintJob::class)->count([]));
     }
 
+    public function testSinglePackageReprintUsesCurrentDefaultPrinterAndQueuesOneJob(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Reprint Customer', '+18125551234');
+        $order = $this->createOrder('3020', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $item->setQuantity('2');
+        $printer = $this->createDefaultLabelPrinter('Current label printer');
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $action = sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId());
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', $action, ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
+        self::assertCount(1, $jobs);
+        self::assertSame($printer->getId(), $jobs[0]->getPrinter()?->getId());
+        self::assertSame($item->getId(), $jobs[0]->getOrderItem()?->getId());
+        self::assertSame(1, $jobs[0]->getPackageNumber());
+        self::assertSame(2, $jobs[0]->getPackageCount());
+        self::assertSame('1', $jobs[0]->getPackageQuantity());
+        self::assertSame(PrintJobStatus::QUEUED, $jobs[0]->getStatus());
+        self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testReprintAllCreatesOneNewJobPerCurrentPackage(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('All Reprint Customer', '+18125551234');
+        $order = $this->createOrder('3021', $user, $productType, $unit, $customer, itemCount: 2);
+        $this->createDefaultLabelPrinter('All labels printer');
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $action = '/orders/'.$order->getId().'/labels/reprint';
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', $action, ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        self::assertSame(3, $this->entityManager->getRepository(PrintJob::class)->count(['order' => $order]));
+        self::assertCount(3, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testReprintUsesCurrentPackageAllocationAfterOrderEdit(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Edited Reprint Customer', '+18125551234');
+        $order = $this->createOrder('3022', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $historicalPrinter = (new Printer())
+            ->setName('Historical label printer')
+            ->setAddress('ipp://printer.example/historical-labels')
+            ->setForLabels(true);
+        $this->entityManager->persist($historicalPrinter);
+        $this->entityManager->flush();
+        $currentPrinter = $this->createDefaultLabelPrinter('Edited order printer');
+        $historicalJob = (new PrintJob())
+            ->setPrinter($historicalPrinter)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::COMPLETED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($historicalJob);
+        $item->setQuantity('2');
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $action = '/orders/'.$order->getId().'/labels/reprint';
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', $action, ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
+        self::assertCount(3, $jobs);
+        self::assertSame(1, $jobs[1]->getPackageNumber());
+        self::assertSame(2, $jobs[1]->getPackageCount());
+        self::assertSame(2, $jobs[2]->getPackageNumber());
+        self::assertSame(2, $jobs[2]->getPackageCount());
+        self::assertSame($currentPrinter->getId(), $jobs[1]->getPrinter()?->getId());
+        self::assertSame($historicalPrinter->getId(), $historicalJob->getPrinter()?->getId());
+        self::assertSame(1, $historicalJob->getPackageCount());
+    }
+
+    public function testRetryRenderedFailureCreatesNewRenderedJobAndKeepsFailureHistory(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Retry Customer', '+18125551234');
+        $order = $this->createOrder('3023', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printer = $this->createDefaultLabelPrinter('Retry printer');
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1')
+            ->setDocumentPath('labels/2026/10/order-3023-box-1.pdf')
+            ->setExternalJobId(null)
+            ->setErrorMessage('Printer did not accept the document.');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $action = '/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry';
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', $action, ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
+        self::assertCount(2, $jobs);
+        $retry = $jobs[1];
+        self::assertSame(PrintJobStatus::FAILED, $failedJob->getStatus());
+        self::assertSame('Printer did not accept the document.', $failedJob->getErrorMessage());
+        self::assertSame(PrintJobStatus::RENDERED, $retry->getStatus());
+        self::assertSame($printer->getId(), $retry->getPrinter()?->getId());
+        self::assertSame($failedJob->getDocumentPath(), $retry->getDocumentPath());
+        self::assertNull($retry->getExternalJobId());
+        self::assertSame(0, $retry->getAttemptCount());
+        self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testLatestPackageJobControlsDisplayedStatusAndRetryAction(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Latest Status Customer', '+18125551234');
+        $order = $this->createOrder('3024', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printer = $this->createDefaultLabelPrinter('Latest status printer');
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+        $completedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::COMPLETED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1')
+            ->setCreatedAt($failedJob->getCreatedAt()->modify('+1 second'));
+        $this->entityManager->persist($completedJob);
+        $this->entityManager->flush();
+
+        $this->client->request('GET', '/orders/'.$order->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.list-group-item', 'Completed');
+        self::assertStringNotContainsString('/print-jobs/'.$failedJob->getId().'/retry', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testLabelActionsRequireTheirScopedCsrfTokens(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('CSRF Customer', '+18125551234');
+        $order = $this->createOrder('3025', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printer = $this->createDefaultLabelPrinter('CSRF printer');
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+
+        $this->client->request('POST', '/orders/'.$order->getId().'/labels/reprint', ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('POST', sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId()), ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('POST', '/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry', ['_token' => 'invalid']);
+        self::assertResponseStatusCodeSame(403);
+
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertCount(0, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testCancelledOrderCannotCreateLabelsWithValidTokens(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Cancelled Customer', '+18125551234');
+        $order = $this->createOrder('3026', $user, $productType, $unit, $customer);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $printer = $this->createDefaultLabelPrinter('Cancelled printer');
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $allToken = $crawler->filter('form[action="/orders/'.$order->getId().'/labels/reprint"] input[name="_token"]')->attr('value');
+        $packageToken = $crawler->filter(sprintf('form[action="/orders/%d/labels/%d/1/reprint"] input[name="_token"]', $order->getId(), $item->getId()))->attr('value');
+        $retryToken = $crawler->filter('form[action="/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry"] input[name="_token"]')->attr('value');
+        $order->setStatus(OrderStatus::CANCELLED);
+        $this->entityManager->flush();
+
+        $actions = [
+            ['/orders/'.$order->getId().'/labels/reprint', $allToken],
+            [sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId()), $packageToken],
+            ['/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry', $retryToken],
+        ];
+        foreach ($actions as [$action, $token]) {
+            $this->client->request('POST', $action, ['_token' => $token]);
+            self::assertResponseRedirects('/orders/'.$order->getId());
+        }
+
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertCount(0, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testRetryRejectsPrintJobOwnedByAnotherOrder(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Ownership Customer', '+18125551234');
+        $orderA = $this->createOrder('3027', $user, $productType, $unit, $customer);
+        $orderB = $this->createOrder('3028', $user, $productType, $unit, $customer);
+        $itemA = $orderA->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $itemA);
+        $printer = $this->createDefaultLabelPrinter('Ownership printer');
+        $failedJob = (new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::FAILED)
+            ->setOrder($orderA)
+            ->setOrderItem($itemA)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity('1');
+        $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$orderA->getId());
+        $action = '/orders/'.$orderA->getId().'/print-jobs/'.$failedJob->getId().'/retry';
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/orders/'.$orderB->getId().'/print-jobs/'.$failedJob->getId().'/retry', ['_token' => $token]);
+
+        self::assertResponseStatusCodeSame(404);
+        self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
+        self::assertCount(0, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
     public function testUnknownOrderLabelReturnsNotFound(): void
     {
         $this->client->request('GET', '/orders/999/label');
@@ -576,6 +864,19 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         return $customer;
+    }
+
+    private function createDefaultLabelPrinter(string $name): Printer
+    {
+        $printer = (new Printer())
+            ->setName($name)
+            ->setAddress('ipp://printer.example/labels')
+            ->setForLabels(true)
+            ->setDefaultForLabels(true);
+        $this->entityManager->persist($printer);
+        $this->entityManager->flush();
+
+        return $printer;
     }
 
     private function createOrder(
