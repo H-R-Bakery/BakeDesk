@@ -507,7 +507,10 @@ final class OrderControllerTest extends WebTestCase
         self::getContainer()->set(OrderRealtimePublisher::class, new OrderRealtimePublisher($hub, $this->createStub(LoggerInterface::class)));
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
-        self::assertSelectorExists('form[action="/orders/'.$order->getId().'/complete"]');
+        $completeForm = $crawler->filter('form[action="/orders/'.$order->getId().'/complete"]');
+        self::assertCount(1, $completeForm);
+        self::assertSame('confirm-action', $completeForm->attr('data-controller'));
+        self::assertStringContainsString('not marked as paid', (string) $completeForm->attr('data-confirm-action-message-value'));
         self::assertSelectorTextContains('body', 'Mark Completed');
         $completeToken = $crawler->filter('form[action="/orders/'.$order->getId().'/complete"] input[name="_token"]')->attr('value');
         $this->client->request('POST', '/orders/'.$order->getId().'/complete', ['_token' => $completeToken]);
@@ -564,6 +567,24 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->clear();
         self::assertSame(OrderStatus::OPEN, $this->entityManager->getRepository(Order::class)->find($open->getId())?->getStatus());
         self::assertSame(OrderStatus::COMPLETED, $this->entityManager->getRepository(Order::class)->find($completed->getId())?->getStatus());
+    }
+
+    public function testPaidOrderCompletionDoesNotAskForPaymentConfirmation(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Paid Workflow Customer', '+18125551234');
+        $order = $this->createOrder('3015', $user, $productType, $unit, $customer);
+        $order->setPaid(true);
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $form = $crawler->filter('form[action="/orders/'.$order->getId().'/complete"]');
+
+        self::assertCount(1, $form);
+        self::assertNull($form->attr('data-controller'));
+        self::assertNull($form->attr('data-confirm-action-message-value'));
     }
 
     public function testInvalidOrderWorkflowTransitionsAreRejectedWithoutStateChanges(): void

@@ -14,7 +14,7 @@
         <div class="d-flex flex-wrap gap-2">
             {% if order.status.value == 'open' %}
                 <a class="btn btn-outline-primary" href="{{ path('order_edit', {id: order.id}) }}">Edit order</a>
-                <form method="post" action="{{ path('order_complete', {id: order.id}) }}">
+                <form method="post" action="{{ path('order_complete', {id: order.id}) }}"{% if not order.paid %} data-controller="confirm-action" data-action="submit->confirm-action#submit" data-confirm-action-message-value="Order #{{ order.orderNumber }} is not marked as paid. Are you sure you want to mark it completed?"{% endif %}>
                     <input type="hidden" name="_token" value="{{ csrf_token('complete-order-' ~ order.id) }}">
                     <button type="submit" class="btn btn-success">Mark Completed</button>
                 </form>

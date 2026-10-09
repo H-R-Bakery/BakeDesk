@@ -33,4 +33,6 @@ return [
     'bootstrap-table' => ['version' => '1.25.0'],
     'bootstrap-table/dist/bootstrap-table.min.css' => ['version' => '1.25.0', 'type' => 'css'],
     'jquery' => ['version' => '3.7.1'],
+    'sweetalert2' => ['version' => '11.26.25'],
+    'sweetalert2/dist/sweetalert2.min.css' => ['version' => '11.26.25', 'type' => 'css'],
 ];
