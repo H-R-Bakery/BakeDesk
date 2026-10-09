@@ -35,7 +35,7 @@
         <div class="card-body">
             <dl class="row mb-0">
                 <dt class="col-sm-3">Customer</dt>
-                <dd class="col-sm-9">{{ order.customerName }}<br><span class="text-body-secondary">{{ order.customerPhone|phone_number_format('NATIONAL') }}</span></dd>
+                <dd class="col-sm-9"><a href="{{ path('customer_detail', {id: order.customer.id}) }}">{{ order.customerName }}</a><br><span class="text-body-secondary">{{ order.customerPhone|phone_number_format('NATIONAL') }}</span></dd>
                 <dt class="col-sm-3">Pickup</dt>
                 <dd class="col-sm-9">{{ order.pickupAt|date('D, M j, Y g:i A', bakery_timezone) }}</dd>
                 <dt class="col-sm-3">Taken by</dt>

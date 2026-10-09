@@ -84,7 +84,7 @@
                         <tr data-order-id="{{ order.id }}">
                             <td data-sort-value="{{ order.orderNumber }}"><a class="fw-semibold" href="{{ path('order_detail', {id: order.id}) }}">{{ order.orderNumber }}</a></td>
                             <td data-sort-value="{{ order.pickupAt|date('Y-m-d H:i:s', bakery_timezone) }}"><span class="d-block">{{ order.pickupAt|date('D, M j', bakery_timezone) }}</span><span class="text-body-secondary">{{ order.pickupAt|date('g:i A', bakery_timezone) }}</span></td>
-                            <td>{{ order.customerName }}</td>
+                            <td><a href="{{ path('customer_detail', {id: order.customer.id}) }}">{{ order.customerName }}</a></td>
                             <td>{{ order.customerPhone|phone_number_format('NATIONAL') }}</td>
                             <td>{{ order.user.name }}</td>
                             <td>{{ row.itemCount }} item{{ row.itemCount == 1 ? '' : 's' }}</td>

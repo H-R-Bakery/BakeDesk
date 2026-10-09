@@ -146,6 +146,14 @@ even when the order is associated with a `Customer` entity.
 
 Editing the customer record later must not rewrite historical orders.
 
+Operational staff may view customer history at a purpose-built route outside
+EasyAdmin. Customer history includes Orders in every lifecycle status, and
+historical Order customer snapshots remain authoritative for historical display.
+Active Customers may prefill the existing New Order form. Inactive Customers
+must not be silently selected for new Orders. Customer history does not duplicate
+Order creation logic; New Order prefill continues through the normal
+CustomerResolver and order creation behavior.
+
 ---
 
 ## Order takers

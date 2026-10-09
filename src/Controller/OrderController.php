@@ -21,10 +21,12 @@ use App\Application\Printing\LabelPrinterConfigurationException;
 use App\Application\Printing\LabelPrintJobCreator;
 use App\Application\Printing\LabelPrintJobRetryService;
 use App\Application\Printing\PrintJobRetryException;
+use App\Entity\Customer;
 use App\Entity\Order;
 use App\Form\Model\NewOrderData;
 use App\Form\NewOrderType;
 use App\Model\OrderStatus;
+use App\Repository\CustomerRepository;
 use App\Repository\OrderRepository;
 use App\Repository\PrintJobRepository;
 use App\Repository\UserRepository;
@@ -44,12 +46,29 @@ final class OrderController extends AbstractController
         Request $request,
         NewOrderInputFactory $newOrderInputFactory,
         BakeryClock $bakeryClock,
+        CustomerRepository $customerRepository,
         LabelPrintJobCreator $labelPrintJobCreator,
         LoggerInterface $logger,
     ): Response {
         $data = new NewOrderData();
         $data->pickupDate = $bakeryClock->tomorrow();
         $data->pickupTime = $bakeryClock->tomorrow(morning: true);
+
+        if ($request->isMethod('GET')) {
+            $customerId = $request->query->get('customer');
+            if (is_scalar($customerId) && false !== ($customerId = filter_var($customerId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]))) {
+                $customer = $customerRepository->find($customerId);
+                if ($customer instanceof Customer && $customer->isActive()) {
+                    $data->customerId = $customer->getId();
+                    $data->customerName = $customer->getName();
+                    $data->customerPhone = $customer->getPhone();
+                } elseif ($customer instanceof Customer) {
+                    $this->addFlash('warning', 'That customer is inactive and was not selected for the new order.');
+                } else {
+                    $this->addFlash('warning', 'That customer could not be found, so the new order form was left blank.');
+                }
+            }
+        }
 
         $form = $this->createForm(NewOrderType::class, $data);
         $form->handleRequest($request);

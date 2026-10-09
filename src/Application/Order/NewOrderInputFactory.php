@@ -46,6 +46,9 @@ final class NewOrderInputFactory
         }
 
         $selectedCustomer = null === $data->customerId ? null : $this->customerRepository->find($data->customerId);
+        if (null !== $selectedCustomer && !$selectedCustomer->isActive()) {
+            $selectedCustomer = null;
+        }
 
         return new OrderInput(
             customerName: trim($data->customerName),

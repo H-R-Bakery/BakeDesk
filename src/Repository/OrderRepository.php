@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Application\Order\OrderListRow;
 use App\Application\Order\OrderSearchCriteria;
+use App\Entity\Customer;
 use App\Entity\Order;
 use App\Model\OrderStatus;
 use Doctrine\DBAL\Types\Types;
@@ -67,6 +68,59 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @return list<Order>
+     */
+    public function findForCustomerHistory(
+        Customer $customer,
+        int $page = 1,
+        int $pageSize = 25,
+    ): array {
+        $page = max(1, $page);
+        $pageSize = min(max(1, $pageSize), 100);
+
+        $orderIds = $this->createQueryBuilder('o')
+            ->select('o.id')
+            ->andWhere('o.customer = :customer')
+            ->setParameter('customer', $customer)
+            ->orderBy('o.pickupAt', 'DESC')
+            ->addOrderBy('o.id', 'DESC')
+            ->setFirstResult(($page - 1) * $pageSize)
+            ->setMaxResults($pageSize)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        if ([] === $orderIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('o')
+            ->leftJoin('o.user', 'user')
+            ->addSelect('user')
+            ->leftJoin('o.items', 'item')
+            ->addSelect('item')
+            ->leftJoin('item.productType', 'productType')
+            ->addSelect('productType')
+            ->leftJoin('item.unit', 'unit')
+            ->addSelect('unit')
+            ->andWhere('o.id IN (:orderIds)')
+            ->setParameter('orderIds', $orderIds)
+            ->orderBy('o.pickupAt', 'DESC')
+            ->addOrderBy('o.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countForCustomerHistory(Customer $customer): int
+    {
+        return (int) $this->createQueryBuilder('o')
+            ->select('COUNT(o.id)')
+            ->andWhere('o.customer = :customer')
+            ->setParameter('customer', $customer)
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     /**

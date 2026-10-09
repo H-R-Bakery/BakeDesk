@@ -17,7 +17,9 @@ class CustomerRepository extends AbstractServiceEntityRepository
     {
         return $this->createQueryBuilder('customer')
             ->andWhere('customer.phone = :phone')
+            ->andWhere('customer.active = :active')
             ->setParameter('phone', $phone, 'phone_number')
+            ->setParameter('active', true)
             ->orderBy('customer.id', 'ASC')
             ->setMaxResults(1)
             ->getQuery()
