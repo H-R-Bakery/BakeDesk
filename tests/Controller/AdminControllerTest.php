@@ -76,6 +76,7 @@ final class AdminControllerTest extends WebTestCase
         $this->client->request('GET', '/order/new');
 
         self::assertResponseIsSuccessful();
+        self::assertSelectorExists('nav.navbar.navbar-expand');
         self::assertSelectorTextContains('nav .navbar-nav > .nav-item > a[href="/order/new"]', 'New Order');
         self::assertSelectorTextContains('nav .navbar-nav > .nav-item > a[href="/orders"]', 'Orders');
         self::assertSelectorTextContains('nav .navbar-nav > .dropdown > a', 'More');
