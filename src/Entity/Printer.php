@@ -28,7 +28,7 @@ class Printer
     private string $name = '';
 
     #[Assert\NotBlank]
-    #[Assert\Url(protocols: ['ipp', 'ipps', 'http', 'https'])]
+    #[Assert\Url(protocols: ['ipp', 'ipps', 'http', 'https'], requireTld: false)]
     #[ORM\Column(length: 2048)]
     private string $address = '';
 
