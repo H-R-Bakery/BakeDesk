@@ -19,7 +19,7 @@
 
     <form method="get" action="{{ path('order_index') }}" class="card card-body shadow-sm mb-4">
         <div class="row g-3 align-items-end">
-            <div class="col-12 col-lg-5">
+            <div class="col-12 col-lg-4">
                 <label class="form-label" for="order-search">Search</label>
                 <input class="form-control" id="order-search" type="search" name="q" value="{{ query }}" placeholder="Order number, customer, or phone">
             </div>
@@ -45,7 +45,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-12 col-lg-1 d-flex gap-2">
+            <div class="col-12 col-lg-2 d-flex gap-2">
                 <button class="btn btn-primary flex-grow-1" type="submit">Search</button>
                 {% if not is_default_upcoming %}
                     <a class="btn btn-outline-secondary" href="{{ path('order_index') }}">Clear</a>
