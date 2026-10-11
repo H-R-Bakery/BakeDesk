@@ -175,7 +175,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertCount(2, $printJobs);
         self::assertSame([1, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageNumber(), $printJobs));
         self::assertSame([2, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageCount(), $printJobs));
-        self::assertSame(['1', '1'], array_map(static fn (PrintJob $printJob): ?string => $printJob->getPackageQuantity(), $printJobs));
+        self::assertSame([1, 1], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageQuantity(), $printJobs));
         self::assertSame(array_map(static fn (PrintJob $printJob): ?int => $printJob->getId(), $printJobs), $dispatchedJobIds);
         foreach ($printJobs as $printJob) {
             self::assertNotNull($printJob->getId());
@@ -426,7 +426,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($cookies)
-                ->setQuantity('1')
+                ->setQuantity(1)
                 ->setUnit($tray)
                 ->setDescription('Chocolate Chip')
                 ->setSortOrder(20),
@@ -453,7 +453,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertSame($printer, $printJobs[0]->getPrinter());
         self::assertSame([1, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $printJobs));
         self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
-        self::assertSame(['1', '1', '1'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $printJobs));
+        self::assertSame([1, 1, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $printJobs));
         self::assertSame($order->getItems()->toArray()[0], $printJobs[0]->getOrderItem());
         self::assertSame($order->getItems()->toArray()[1], $printJobs[2]->getOrderItem());
     }
@@ -470,12 +470,12 @@ final class PrintJobPipelineTest extends KernelTestCase
         $rule = (new PackagingRule())
             ->setProductType($cookies)
             ->setUnit($each)
-            ->setQuantityPerPackage('24');
+                ->setQuantityPerPackage(24);
         $this->entityManager->persist($rule);
         $order->addItem(
             (new OrderItem())
                 ->setProductType($cookies)
-                ->setQuantity('30')
+                ->setQuantity(30)
                 ->setUnit($each)
                 ->setDescription('Chocolate Chip')
                 ->setSortOrder(20),
@@ -498,7 +498,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         $printJobs = $creator->createAndDispatch($order);
         $ruleJobs = array_slice($printJobs, -2);
 
-        self::assertSame(['24', '6'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $ruleJobs));
+        self::assertSame([24, 6], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $ruleJobs));
         self::assertSame([1, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $ruleJobs));
         self::assertSame([2, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $ruleJobs));
     }
@@ -517,7 +517,7 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setOrderItem($orderItem)
             ->setPackageNumber(1)
             ->setPackageCount(2)
-            ->setPackageQuantity('1')
+                ->setPackageQuantity(1)
             ->setDocumentPath('labels/2026/10/failed-label.pdf')
             ->setExternalJobId('old-ipp-job')
             ->setErrorMessage('Printer rejected the document.');
@@ -868,7 +868,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($productType)
-                ->setQuantity('2')
+                ->setQuantity(2)
                 ->setUnit($unit)
                 ->setDescription('Glazed donuts'),
         );

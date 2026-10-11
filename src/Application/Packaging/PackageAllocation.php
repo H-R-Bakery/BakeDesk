@@ -13,7 +13,7 @@ final readonly class PackageAllocation
         public OrderItem $orderItem,
         public int $packageNumber,
         public int $packageCount,
-        public string $quantity,
+        public int $quantity,
         public Unit $unit,
     ) {
         if ($packageNumber < 1 || $packageCount < 1 || $packageNumber > $packageCount) {

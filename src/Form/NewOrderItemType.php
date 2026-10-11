@@ -12,9 +12,11 @@ use App\Repository\UnitRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
+use Symfony\Component\Validator\Constraints\Positive;
 
 final class NewOrderItemType extends AbstractType
 {
@@ -50,12 +52,13 @@ final class NewOrderItemType extends AbstractType
                 'label' => 'Type',
                 'attr' => ['class' => 'form-select'],
             ])
-            ->add('quantity', TextType::class, [
+            ->add('quantity', IntegerType::class, [
                 'label' => 'Quantity',
+                'constraints' => [new Positive(message: 'Quantity must be greater than zero.')],
                 'attr' => [
                     'class' => 'form-control',
-                    'inputmode' => 'decimal',
-                    'pattern' => '[0-9]+([.][0-9]{1,2})?',
+                    'min' => 1,
+                    'step' => 1,
                 ],
             ])
             ->add('unit', EntityType::class, [

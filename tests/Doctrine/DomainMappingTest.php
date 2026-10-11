@@ -46,21 +46,15 @@ final class DomainMappingTest extends KernelTestCase
 
         $orderItemMetadata = $entityManager->getClassMetadata(OrderItem::class);
         $quantityMapping = $orderItemMetadata->getFieldMapping('quantity');
-        self::assertSame('decimal', $quantityMapping->type);
-        self::assertSame(10, $quantityMapping->precision);
-        self::assertSame(2, $quantityMapping->scale);
+        self::assertSame('integer', $quantityMapping->type);
 
         $unitMetadata = $entityManager->getClassMetadata(Unit::class);
         self::assertTrue($unitMetadata->hasField('packageUnit'));
         self::assertSame('boolean', $unitMetadata->getFieldMapping('packageUnit')->type);
-        self::assertSame('decimal', $unitMetadata->getFieldMapping('eachEquivalent')->type);
-        self::assertSame(10, $unitMetadata->getFieldMapping('eachEquivalent')->precision);
-        self::assertSame(2, $unitMetadata->getFieldMapping('eachEquivalent')->scale);
+        self::assertSame('integer', $unitMetadata->getFieldMapping('eachEquivalent')->type);
 
         $packagingRuleMetadata = $entityManager->getClassMetadata(PackagingRule::class);
-        self::assertSame('decimal', $packagingRuleMetadata->getFieldMapping('quantityPerPackage')->type);
-        self::assertSame(10, $packagingRuleMetadata->getFieldMapping('quantityPerPackage')->precision);
-        self::assertSame(2, $packagingRuleMetadata->getFieldMapping('quantityPerPackage')->scale);
+        self::assertSame('integer', $packagingRuleMetadata->getFieldMapping('quantityPerPackage')->type);
         self::assertSame(
             ['product_type_id', 'unit_id', 'active'],
             $packagingRuleMetadata->table['uniqueConstraints']['uniq_packaging_rule_product_unit_active']['columns'],
@@ -75,6 +69,7 @@ final class DomainMappingTest extends KernelTestCase
         self::assertTrue($printJobMetadata->getFieldMapping('packageNumber')->nullable);
         self::assertTrue($printJobMetadata->getFieldMapping('packageCount')->nullable);
         self::assertTrue($printJobMetadata->getFieldMapping('packageQuantity')->nullable);
+        self::assertSame('integer', $printJobMetadata->getFieldMapping('packageQuantity')->type);
         self::assertSame('date_immutable', $printJobMetadata->getFieldMapping('reportDate')->type);
         self::assertTrue($printJobMetadata->getFieldMapping('reportDate')->nullable);
 

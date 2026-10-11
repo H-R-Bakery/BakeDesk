@@ -52,43 +52,43 @@ final class ProductionReportPdfIntegrationTest extends KernelTestCase
         return new ProductionReport(
             new \DateTimeImmutable('2026-10-09', $timezone),
             [
-                new ProductionReportSection('Donuts', '26', [
+                new ProductionReportSection('Donuts', 26, [
                     new ProductionReportLine(
                         '1001',
                         new \DateTimeImmutable('2026-10-09 08:00:00', $timezone),
                         'Snapshot Customer',
-                        '1',
+                        1,
                         'Dozen',
-                        '12',
+                        12,
                         'Glazed',
                     ),
                     new ProductionReportLine(
                         '1004',
                         new \DateTimeImmutable('2026-10-09 09:30:00', $timezone),
                         'Completed Customer',
-                        '14',
+                        14,
                         'Each',
-                        '14',
+                        14,
                         'Assorted',
                     ),
                 ]),
-                new ProductionReportSection('Cookies', '22', [
+                new ProductionReportSection('Cookies', 22, [
                     new ProductionReportLine(
                         '1001',
                         new \DateTimeImmutable('2026-10-09 08:00:00', $timezone),
                         'Snapshot Customer',
-                        '2',
+                        2,
                         'Each',
-                        '2',
+                        2,
                         'Chocolate Chip',
                     ),
                     new ProductionReportLine(
                         '1004',
                         new \DateTimeImmutable('2026-10-09 09:30:00', $timezone),
                         'Completed Customer',
-                        '1',
+                        1,
                         'Tray',
-                        '20',
+                        20,
                         'Sugar',
                     ),
                 ]),

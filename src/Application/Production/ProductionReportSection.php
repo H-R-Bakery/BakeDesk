@@ -11,7 +11,7 @@ final readonly class ProductionReportSection
      */
     public function __construct(
         public string $productTypeName,
-        public string $totalEachQuantity,
+        public int $totalEachQuantity,
         public array $lines,
     ) {
     }

@@ -11,7 +11,7 @@ final readonly class OrderItemInput
 {
     public function __construct(
         public ProductType $productType,
-        public string $quantity,
+        public int $quantity,
         public Unit $unit,
         public string $description,
         public int $sortOrder = 0,

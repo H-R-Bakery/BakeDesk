@@ -70,15 +70,15 @@ final class ProductionReportPdfRendererTest extends KernelTestCase
             orderNumber: '1001',
             pickupAt: new \DateTimeImmutable('2026-10-09 08:00:00', $timezone),
             customerName: 'Snapshot Customer',
-            quantity: '1',
+            quantity: 1,
             unitName: 'Dozen',
-            eachQuantity: '12',
+            eachQuantity: 12,
             description: 'Glazed',
         );
 
         return new ProductionReport(
             new \DateTimeImmutable('2026-10-09', $timezone),
-            [new ProductionReportSection('Donuts', '26', [$line])],
+            [new ProductionReportSection('Donuts', 26, [$line])],
         );
     }
 }

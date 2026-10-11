@@ -17,7 +17,7 @@ final class NewOrderItemData
 
     #[Assert\NotBlank(message: 'Enter a quantity.')]
     #[Assert\Positive(message: 'Quantity must be greater than zero.')]
-    public ?string $quantity = null;
+    public ?int $quantity = null;
 
     #[Assert\NotNull(message: 'Choose a unit.')]
     public ?Unit $unit = null;

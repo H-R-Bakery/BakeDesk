@@ -10,14 +10,13 @@ final readonly class ProductionTotalsCalculator
 {
     public function __construct(
         private ProductionQuantityCalculator $productionQuantityCalculator,
-        private DecimalArithmetic $decimalArithmetic,
     ) {
     }
 
     /**
      * @param iterable<OrderItem> $orderItems
      *
-     * @return array<string, string> totals keyed by ProductType name
+     * @return array<string, int> totals keyed by ProductType name
      */
     public function calculate(iterable $orderItems): array
     {
@@ -30,9 +29,7 @@ final readonly class ProductionTotalsCalculator
 
             $name = $productType->getName();
             $quantity = $this->productionQuantityCalculator->calculate($orderItem);
-            $totals[$name] = isset($totals[$name])
-                ? $this->decimalArithmetic->add($totals[$name], $quantity)
-                : $quantity;
+            $totals[$name] = ($totals[$name] ?? 0) + $quantity;
         }
 
         return $totals;

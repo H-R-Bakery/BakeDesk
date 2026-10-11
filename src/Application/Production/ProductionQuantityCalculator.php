@@ -8,24 +8,19 @@ use App\Entity\OrderItem;
 
 final readonly class ProductionQuantityCalculator
 {
-    public function __construct(
-        private DecimalArithmetic $decimalArithmetic,
-    ) {
-    }
-
-    public function calculate(OrderItem $orderItem): string
+    public function calculate(OrderItem $orderItem): int
     {
         $unit = $orderItem->getUnit();
         if (null === $unit) {
             throw new \InvalidArgumentException('An order item must have a unit before its production quantity can be calculated.');
         }
-        if (!$this->decimalArithmetic->isPositive($orderItem->getQuantity())) {
+        if ($orderItem->getQuantity() < 1) {
             throw new \InvalidArgumentException('An order item quantity must be greater than zero.');
         }
-        if (!$this->decimalArithmetic->isPositive($unit->getEachEquivalent())) {
+        if ($unit->getEachEquivalent() < 1) {
             throw new \InvalidArgumentException('A unit each equivalent must be greater than zero.');
         }
 
-        return $this->decimalArithmetic->multiply($orderItem->getQuantity(), $unit->getEachEquivalent());
+        return $orderItem->getQuantity() * $unit->getEachEquivalent();
     }
 }

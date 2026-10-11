@@ -52,8 +52,8 @@ class PrintJob
     private ?int $packageCount = null;
 
     #[Assert\Positive]
-    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    private ?string $packageQuantity = null;
+    #[ORM\Column(nullable: true)]
+    private ?int $packageQuantity = null;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $reportDate = null;
@@ -177,12 +177,12 @@ class PrintJob
         return $this;
     }
 
-    public function getPackageQuantity(): ?string
+    public function getPackageQuantity(): ?int
     {
         return $this->packageQuantity;
     }
 
-    public function setPackageQuantity(?string $packageQuantity): static
+    public function setPackageQuantity(?int $packageQuantity): static
     {
         $this->packageQuantity = $packageQuantity;
 

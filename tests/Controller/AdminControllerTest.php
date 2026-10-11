@@ -173,7 +173,7 @@ final class AdminControllerTest extends WebTestCase
         $order->addItem((new OrderItem())
             ->setProductType($productType)
             ->setUnit($unit)
-            ->setQuantity('6')
+            ->setQuantity(6)
             ->setDescription('Glazed'));
         $this->entityManager->persist($customer);
         $this->entityManager->persist($productType);
@@ -330,7 +330,7 @@ final class AdminControllerTest extends WebTestCase
     {
         $productType = (new ProductType())->setName('Cookies');
         $unit = (new Unit())->setName('Box')->setPackageUnit(true);
-        $rule = (new PackagingRule())->setProductType($productType)->setUnit($unit)->setQuantityPerPackage('24');
+        $rule = (new PackagingRule())->setProductType($productType)->setUnit($unit)->setQuantityPerPackage(24);
 
         $violations = self::getContainer()->get(ValidatorInterface::class)->validate($rule);
 

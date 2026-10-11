@@ -98,7 +98,7 @@ final class OrderLabelRendererTest extends KernelTestCase
     {
         $order = $this->createOrder();
         $donuts = $order->getItems()->toArray()[1];
-        $allocation = new PackageAllocation($donuts, 1, 2, '1', $donuts->getUnit());
+        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit());
         $renderedHtml = $this->renderLabel($allocation);
 
         self::assertStringContainsString('1 Dozen', $renderedHtml);
@@ -123,7 +123,7 @@ final class OrderLabelRendererTest extends KernelTestCase
             $order->addItem(
                 (new OrderItem())
                     ->setProductType((new ProductType())->setName('Cookies'))
-                    ->setQuantity('1')
+                    ->setQuantity(1)
                     ->setUnit((new Unit())->setName('Each'))
                     ->setDescription('A deliberately long description that cannot fit in the fixed label item area.')
                     ->setSortOrder($sortOrder),
@@ -192,7 +192,7 @@ final class OrderLabelRendererTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($brownies)
-                ->setQuantity('1')
+                ->setQuantity(1)
                 ->setUnit($box)
                 ->setDescription('No nuts')
                 ->setSortOrder(20),
@@ -200,7 +200,7 @@ final class OrderLabelRendererTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($donuts)
-                ->setQuantity('2')
+                ->setQuantity(2)
                 ->setUnit($dozen)
                 ->setDescription('Glazed donuts')
                 ->setSortOrder(10),

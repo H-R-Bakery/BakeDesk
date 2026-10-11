@@ -23,6 +23,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use libphonenumber\PhoneNumberUtil;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -123,7 +124,7 @@ final class OrderControllerTest extends WebTestCase
             'new_order[paid]' => '1',
             'new_order[notes]' => 'Call when ready',
             'new_order[items][0][productType]' => (string) $productType->getId(),
-            'new_order[items][0][quantity]' => '2.25',
+            'new_order[items][0][quantity]' => '2',
             'new_order[items][0][unit]' => (string) $unit->getId(),
             'new_order[items][0][description]' => 'Glazed',
         ]);
@@ -158,7 +159,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertCount(2, $order->getItems());
         $items = $order->getItems()->toArray();
         self::assertSame(['Glazed', 'Chocolate'], array_map(static fn (OrderItem $item): string => $item->getDescription(), $items));
-        self::assertSame(['2.25', '1'], array_map(static fn (OrderItem $item): string => $item->getQuantity(), $items));
+        self::assertSame([2, 1], array_map(static fn (OrderItem $item): int => $item->getQuantity(), $items));
         self::assertSame([0, 1], array_map(static fn (OrderItem $item): int => $item->getSortOrder(), $items));
     }
 
@@ -262,7 +263,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(1, $this->entityManager->getRepository(Order::class)->count([]));
         self::assertSame(3, $this->entityManager->getRepository(PrintJob::class)->count([]));
         $printJobs = $this->entityManager->getRepository(PrintJob::class)->findBy([], ['id' => 'ASC']);
-        self::assertSame(['1', '1', '24'], array_map(static fn (PrintJob $job): ?string => $job->getPackageQuantity(), $printJobs));
+        self::assertSame([1, 1, 24], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $printJobs));
         self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
     }
 
@@ -294,6 +295,83 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(422);
         self::assertSelectorTextContains('.invalid-feedback', 'Enter the customer name.');
         self::assertSame(0, $this->entityManager->getRepository(Order::class)->count([]));
+    }
+
+    #[DataProvider('wholeNumberQuantityProvider')]
+    public function testWholeNumberOrderQuantityIsAccepted(int $quantity): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+
+        $crawler = $this->client->request('GET', '/order/new');
+        $form = $crawler->selectButton('Save order')->form([
+            'new_order[customerName]' => 'Whole Number Customer',
+            'new_order[customerPhone]' => '8125551234',
+            'new_order[user]' => (string) $user->getId(),
+            'new_order[pickupDate]' => '2026-10-10',
+            'new_order[pickupTime]' => '09:30',
+            'new_order[items][0][productType]' => (string) $productType->getId(),
+            'new_order[items][0][quantity]' => (string) $quantity,
+            'new_order[items][0][unit]' => (string) $unit->getId(),
+            'new_order[items][0][description]' => 'Glazed',
+        ]);
+
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/order/1/created');
+        $this->entityManager->clear();
+        $order = $this->entityManager->getRepository(Order::class)->findOneBy(['orderNumber' => '2000']);
+
+        self::assertInstanceOf(Order::class, $order);
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        self::assertSame($quantity, $item->getQuantity());
+    }
+
+    #[DataProvider('invalidQuantityProvider')]
+    public function testNonWholeOrderQuantityIsRejectedServerSide(string $quantity): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+
+        $crawler = $this->client->request('GET', '/order/new');
+        $form = $crawler->selectButton('Save order')->form([
+            'new_order[customerName]' => 'Fractional Customer',
+            'new_order[customerPhone]' => '8125551234',
+            'new_order[user]' => (string) $user->getId(),
+            'new_order[pickupDate]' => '2026-10-10',
+            'new_order[pickupTime]' => '09:30',
+            'new_order[items][0][productType]' => (string) $productType->getId(),
+            'new_order[items][0][quantity]' => $quantity,
+            'new_order[items][0][unit]' => (string) $unit->getId(),
+            'new_order[items][0][description]' => 'Glazed',
+        ]);
+
+        $this->client->submit($form);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorExists('.invalid-feedback');
+        self::assertSame(0, $this->entityManager->getRepository(Order::class)->count([]));
+    }
+
+    /** @return iterable<string, array{int}> */
+    public static function wholeNumberQuantityProvider(): iterable
+    {
+        yield 'each' => [1];
+        yield 'half dozen' => [6];
+        yield 'dozen' => [12];
+        yield 'custom count' => [25];
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function invalidQuantityProvider(): iterable
+    {
+        yield 'zero' => ['0'];
+        yield 'negative' => ['-1'];
+        yield 'fractional dozen' => ['1.5'];
+        yield 'fractional each' => ['0.5'];
     }
 
     public function testOpenOrderCanBeEditedAndKeepsItsOrderNumber(): void
@@ -476,7 +554,7 @@ final class OrderControllerTest extends WebTestCase
         unset($values['new_order']['items'][1]);
         $values['new_order']['items'][2] = [
             'productType' => (string) $productType->getId(),
-            'quantity' => '1.5',
+            'quantity' => '1',
             'unit' => (string) $unit->getId(),
             'description' => 'Added chocolate',
         ];
@@ -490,7 +568,7 @@ final class OrderControllerTest extends WebTestCase
 
         self::assertCount(2, $items);
         self::assertSame(['Updated glazed', 'Added chocolate'], array_map(static fn (OrderItem $item): string => $item->getDescription(), $items));
-        self::assertSame(['3', '1.5'], array_map(static fn (OrderItem $item): string => $item->getQuantity(), $items));
+        self::assertSame([3, 1], array_map(static fn (OrderItem $item): int => $item->getQuantity(), $items));
         self::assertSame([0, 1], array_map(static fn (OrderItem $item): int => $item->getSortOrder(), $items));
         self::assertNull($this->entityManager->getRepository(OrderItem::class)->find($removedItem->getId()));
     }
@@ -562,7 +640,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
         $printJobId = $printJob->getId();
@@ -669,7 +747,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
         $oldUpdatedAt = $order->getUpdatedAt()?->format('c');
@@ -871,7 +949,7 @@ final class OrderControllerTest extends WebTestCase
         $order = $this->createOrder('3020', $user, $productType, $unit, $customer, OrderStatus::COMPLETED);
         $item = $order->getItems()->first();
         self::assertInstanceOf(OrderItem::class, $item);
-        $item->setQuantity('2');
+        $item->setQuantity(2);
         $printer = $this->createDefaultLabelPrinter('Current label printer');
         $this->entityManager->flush();
 
@@ -887,7 +965,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame($item->getId(), $jobs[0]->getOrderItem()?->getId());
         self::assertSame(1, $jobs[0]->getPackageNumber());
         self::assertSame(2, $jobs[0]->getPackageCount());
-        self::assertSame('1', $jobs[0]->getPackageQuantity());
+        self::assertSame(1, $jobs[0]->getPackageQuantity());
         self::assertSame(PrintJobStatus::QUEUED, $jobs[0]->getStatus());
         self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
     }
@@ -935,9 +1013,9 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($historicalJob);
-        $item->setQuantity('2');
+        $item->setQuantity(2);
         $this->entityManager->flush();
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
@@ -975,7 +1053,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1')
+            ->setPackageQuantity(1)
             ->setDocumentPath('labels/2026/10/order-3023-box-1.pdf')
             ->setExternalJobId(null)
             ->setErrorMessage('Printer did not accept the document.');
@@ -1019,7 +1097,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
         $completedJob = (new PrintJob())
@@ -1030,7 +1108,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1')
+            ->setPackageQuantity(1)
             ->setCreatedAt($failedJob->getCreatedAt()->modify('+1 second'));
         $this->entityManager->persist($completedJob);
         $this->entityManager->flush();
@@ -1060,7 +1138,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
 
@@ -1093,7 +1171,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
@@ -1136,7 +1214,7 @@ final class OrderControllerTest extends WebTestCase
             ->setOrderItem($itemA)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity('1');
+            ->setPackageQuantity(1);
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
 
@@ -1256,7 +1334,7 @@ final class OrderControllerTest extends WebTestCase
             $order->addItem(
                 (new OrderItem())
                     ->setProductType($productType)
-                    ->setQuantity((string) ($index + 1))
+                    ->setQuantity($index + 1)
                     ->setUnit($unit)
                     ->setDescription(0 === $index ? 'Glazed' : 'Chocolate')
                     ->setSortOrder($index),

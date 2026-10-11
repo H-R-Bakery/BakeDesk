@@ -21,7 +21,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\ChoiceField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Filter\ChoiceFilter;
 use EasyCorp\Bundle\EasyAdminBundle\Filter\EntityFilter;
@@ -107,7 +106,7 @@ final class PrintJobCrudController extends AbstractCrudController
         yield AssociationField::new('orderItem', 'Order item');
         yield IntegerField::new('packageNumber', 'Package number');
         yield IntegerField::new('packageCount', 'Package count');
-        yield NumberField::new('packageQuantity', 'Package quantity')->setStoredAsString(true)->setNumDecimals(2);
+        yield IntegerField::new('packageQuantity', 'Package quantity');
         yield IntegerField::new('attemptCount', 'Attempts');
         yield TextField::new('externalJobId', 'External IPP job ID');
         yield TextField::new('documentPath', 'Document path');

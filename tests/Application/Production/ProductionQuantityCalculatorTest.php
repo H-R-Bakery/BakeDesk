@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Application\Production;
 
-use App\Application\Production\DecimalArithmetic;
 use App\Application\Production\ProductionQuantityCalculator;
 use App\Entity\OrderItem;
 use App\Entity\ProductType;
@@ -17,30 +16,30 @@ final class ProductionQuantityCalculatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->calculator = new ProductionQuantityCalculator(new DecimalArithmetic());
+        $this->calculator = new ProductionQuantityCalculator();
     }
 
     public function testEachQuantityIsUnchangedByEachEquivalentOne(): void
     {
-        self::assertSame('14', $this->calculator->calculate($this->item('14', '1')));
+        self::assertSame(14, $this->calculator->calculate($this->item(14, 1)));
     }
 
     public function testConventionalDozenValueCanBeConfigured(): void
     {
-        self::assertSame('24', $this->calculator->calculate($this->item('2', '12')));
+        self::assertSame(24, $this->calculator->calculate($this->item(2, 12)));
     }
 
     public function testDozenDoesNotImplyTwelve(): void
     {
-        self::assertSame('26', $this->calculator->calculate($this->item('2', '13')));
+        self::assertSame(26, $this->calculator->calculate($this->item(2, 13)));
     }
 
-    public function testFractionalQuantityUsesDecimalArithmetic(): void
+    public function testHalfDozenConversionUsesIntegerArithmetic(): void
     {
-        self::assertSame('15', $this->calculator->calculate($this->item('1.5', '10')));
+        self::assertSame(18, $this->calculator->calculate($this->item(3, 6)));
     }
 
-    private function item(string $quantity, string $eachEquivalent): OrderItem
+    private function item(int $quantity, int $eachEquivalent): OrderItem
     {
         return (new OrderItem())
             ->setProductType((new ProductType())->setName('Donuts'))

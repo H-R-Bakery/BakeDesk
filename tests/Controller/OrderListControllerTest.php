@@ -84,7 +84,7 @@ final class OrderListControllerTest extends WebTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($this->productType)
-                ->setQuantity('2')
+                ->setQuantity(2)
                 ->setUnit($this->unit)
                 ->setDescription('Glazed')
                 ->setSortOrder(0),
@@ -154,7 +154,7 @@ final class OrderListControllerTest extends WebTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($this->productType)
-                ->setQuantity('1')
+                ->setQuantity(1)
                 ->setUnit($this->unit)
                 ->setDescription('Chocolate')
                 ->setSortOrder(1),

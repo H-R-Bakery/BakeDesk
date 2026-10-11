@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\PackagingRuleRepository;
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
@@ -38,8 +37,8 @@ class PackagingRule
     private ?Unit $unit = null;
 
     #[Assert\Positive]
-    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
-    private string $quantityPerPackage = '0.00';
+    #[ORM\Column]
+    private int $quantityPerPackage = 1;
 
     public function __construct()
     {
@@ -77,12 +76,12 @@ class PackagingRule
         return $this;
     }
 
-    public function getQuantityPerPackage(): string
+    public function getQuantityPerPackage(): int
     {
         return $this->quantityPerPackage;
     }
 
-    public function setQuantityPerPackage(string $quantityPerPackage): static
+    public function setQuantityPerPackage(int $quantityPerPackage): static
     {
         $this->quantityPerPackage = $quantityPerPackage;
 

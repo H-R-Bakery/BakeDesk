@@ -324,7 +324,7 @@ final class CustomerControllerTest extends WebTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($this->productType)
-                ->setQuantity('2')
+                ->setQuantity(2)
                 ->setUnit($this->unit)
                 ->setDescription($description)
                 ->setSortOrder(0),

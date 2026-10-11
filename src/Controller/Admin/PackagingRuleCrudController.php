@@ -9,7 +9,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 
 /** @extends ReferenceCrudController<PackagingRule> */
 final class PackagingRuleCrudController extends ReferenceCrudController
@@ -29,10 +29,8 @@ final class PackagingRuleCrudController extends ReferenceCrudController
         yield IdField::new('id', 'Rule')->onlyOnIndex();
         yield AssociationField::new('productType', 'Product type')->autocomplete()->setRequired(true);
         yield AssociationField::new('unit', 'Unit')->autocomplete()->setRequired(true);
-        yield NumberField::new('quantityPerPackage', 'Quantity per package')
-            ->setNumDecimals(2)
-            ->setStoredAsString(true)
+        yield IntegerField::new('quantityPerPackage', 'Quantity per package')
             ->setHelp('Optional. Defines how many of this Product Type and Unit fit in one physical package. If no active rule exists, the entire order item is treated as one package.');
-        yield BooleanField::new('active', 'Active')->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true);
+        yield BooleanField::new('active', 'Active')->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true);
     }
 }

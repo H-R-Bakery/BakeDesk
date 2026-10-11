@@ -8,7 +8,6 @@ use App\Entity\Unit;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
 /** @extends ReferenceCrudController<Unit> */
@@ -28,17 +27,15 @@ final class UnitCrudController extends ReferenceCrudController
     {
         yield TextField::new('name', 'Name');
         yield TextField::new('abbreviation', 'Abbreviation')->setRequired(false);
-        yield NumberField::new('eachEquivalent', 'Each equivalent')
-            ->setNumDecimals(2)
-            ->setStoredAsString(true)
-            ->setHelp('Number of individual items represented by one of this unit. Used for production totals. Examples: Each = 1, Dozen could be 12 or 13, Tray might be 20.')
+        yield IntegerField::new('eachEquivalent', 'Number of individual items')
+            ->setHelp('Number of individual items represented by one of this unit. Used for production totals. Examples: Each = 1, Half Dozen = 6, Dozen = 12. A baker\'s dozen could be 13.')
         ;
         yield BooleanField::new('packageUnit', 'Physical package unit')
-            ->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true)
+            ->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true)
             ->setHelp('When enabled, each unit represents one physical package and therefore one label. Examples: 2 Dozen = 2 packages; 1 Tray = 1 package.')
         ;
         yield BooleanField::new('active', 'Active')
-            ->renderAsSwitch($pageName == Crud::PAGE_INDEX ? false : true)
+            ->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true)
         ;
         yield IntegerField::new('sortOrder', 'Sort order')->setHelp('Lower values appear first in order entry and reports.');
     }

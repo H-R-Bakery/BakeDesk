@@ -58,11 +58,11 @@ final class OrderTest extends TestCase
         );
     }
 
-    public function testFractionalQuantityUsesAStringRepresentation(): void
+    public function testOrderItemQuantityUsesAnIntegerRepresentation(): void
     {
-        $item = (new OrderItem())->setQuantity('2.25');
+        $item = (new OrderItem())->setQuantity(2);
 
-        self::assertSame('2.25', $item->getQuantity());
-        self::assertIsString($item->getQuantity());
+        self::assertSame(2, $item->getQuantity());
+        self::assertIsInt($item->getQuantity());
     }
 }

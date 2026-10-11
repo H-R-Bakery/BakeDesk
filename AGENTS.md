@@ -296,11 +296,13 @@ Units must not be PHP enums because administrators may need to add or change the
 
 Do not automatically rewrite stored or displayed order quantities and units.
 
-Every Unit resolves globally to a configurable number of individual items
-(`Each`) through its required decimal `eachEquivalent` value. Unit names have
-no hard-coded mathematical meaning, and the value does not vary by
+Bakery quantities are positive whole-number counts. `OrderItem.quantity`,
+`Unit.eachEquivalent`, and `PackagingRule.quantityPerPackage` are integers;
+fractional quantities are not supported. Separate Units such as `Half Dozen`
+represent concepts that might otherwise be entered fractionally. Unit names
+have no hard-coded mathematical meaning, and the value does not vary by
 `ProductType`. Production totals calculate `OrderItem.quantity ×
-Unit.eachEquivalent` using decimal-safe arithmetic and the current Unit
+Unit.eachEquivalent` with integer multiplication and the current Unit
 configuration. This derived production quantity does not change the original
 OrderItem or its package label content.
 
@@ -332,10 +334,10 @@ ordered using this Unit, split the quantity into packages of this capacity.”
 Package Units create one package per whole Unit quantity. Non-package Units with
 an active rule are split according to that rule. Non-package Units without an
 active rule default to one package containing the entire OrderItem quantity.
-Missing PackagingRules must never prevent label creation. Package arithmetic
-must be decimal-safe and must not use PHP binary floating point. A fractional
-quantity for a package Unit is a focused packaging error; use a separate
-configurable Unit such as `Half Dozen` instead.
+Missing PackagingRules must never prevent label creation. Package allocation
+uses integer division and remainder. Do not introduce PHP floating point for
+quantity calculations. A separate configurable Unit such as `Half Dozen`
+represents that whole count instead of a fractional quantity.
 
 ---
 

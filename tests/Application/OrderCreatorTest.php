@@ -166,8 +166,8 @@ final class OrderCreatorTest extends TestCase
             paid: true,
             notes: 'Call when ready',
             items: [
-                new OrderItemInput($productType, '2.25', $unit, 'Glazed', 20),
-                new OrderItemInput($productType, '1', $unit, 'Chocolate', 10),
+                new OrderItemInput($productType, 2, $unit, 'Glazed', 20),
+                new OrderItemInput($productType, 1, $unit, 'Chocolate', 10),
             ],
         ));
 
@@ -182,7 +182,7 @@ final class OrderCreatorTest extends TestCase
 
         $items = $order->getItems()->toArray();
         self::assertSame(['Glazed', 'Chocolate'], array_map(static fn (OrderItem $item): string => $item->getDescription(), $items));
-        self::assertSame(['2.25', '1'], array_map(static fn (OrderItem $item): string => $item->getQuantity(), $items));
+        self::assertSame([2, 1], array_map(static fn (OrderItem $item): int => $item->getQuantity(), $items));
         self::assertSame([20, 10], array_map(static fn (OrderItem $item): int => $item->getSortOrder(), $items));
         foreach ($items as $item) {
             self::assertSame($order, $item->getOrder());

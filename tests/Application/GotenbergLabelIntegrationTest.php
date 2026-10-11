@@ -54,7 +54,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
             $order->addItem(
                 (new OrderItem())
                     ->setProductType((new ProductType())->setName($productName))
-                    ->setQuantity('1')
+                    ->setQuantity(1)
                     ->setUnit((new Unit())->setName('Each'))
                     ->setDescription('Standard assortment')
                     ->setSortOrder($sortOrder),
@@ -159,7 +159,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($donuts)
-                ->setQuantity('2')
+                ->setQuantity(2)
                 ->setUnit($dozen)
                 ->setDescription('Glazed donuts')
                 ->setSortOrder(10),
@@ -167,7 +167,7 @@ final class GotenbergLabelIntegrationTest extends KernelTestCase
         $order->addItem(
             (new OrderItem())
                 ->setProductType($brownies)
-                ->setQuantity('1')
+                ->setQuantity(1)
                 ->setUnit($box)
                 ->setDescription('No nuts')
                 ->setSortOrder(20),

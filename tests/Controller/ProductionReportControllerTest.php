@@ -83,7 +83,7 @@ final class ProductionReportControllerTest extends WebTestCase
 
     public function testCurrentUnitConversionIsUsedWithoutDozenNameLogic(): void
     {
-        $this->dozen->setEachEquivalent('13');
+        $this->dozen->setEachEquivalent(13);
         $this->entityManager->flush();
         $date = new \DateTimeImmutable('2026-10-09', new \DateTimeZone($this->bakeryClock->getTimezoneName()));
         $this->createOrder('2001', $date->setTime(8, 0), $this->createCustomer('Config Customer', '+18125550004'), [
@@ -124,7 +124,7 @@ final class ProductionReportControllerTest extends WebTestCase
         $this->entityManager->persist((new PackagingRule())
             ->setProductType($this->cookies)
             ->setUnit($this->each)
-            ->setQuantityPerPackage('24'));
+            ->setQuantityPerPackage(24));
         $this->entityManager->flush();
         $date = new \DateTimeImmutable('2026-10-09', new \DateTimeZone($this->bakeryClock->getTimezoneName()));
         $this->createOrder('4001', $date->setTime(8, 0), $this->createCustomer('Package Customer', '+18125550008'), [
@@ -285,9 +285,9 @@ final class ProductionReportControllerTest extends WebTestCase
         $this->user = User::new(email: 'report@example.com', name: 'Report Employee', employee: true)->setPlainPassword('test-password');
         $this->donuts = (new ProductType())->setName('Donuts')->setSortOrder(10);
         $this->cookies = (new ProductType())->setName('Cookies')->setSortOrder(20);
-        $this->each = (new Unit())->setName('Each')->setEachEquivalent('1')->setPackageUnit(false);
-        $this->dozen = (new Unit())->setName('Dozen')->setEachEquivalent('12')->setPackageUnit(false);
-        $this->tray = (new Unit())->setName('Tray')->setEachEquivalent('20')->setPackageUnit(false);
+        $this->each = (new Unit())->setName('Each')->setEachEquivalent(1)->setPackageUnit(false);
+        $this->dozen = (new Unit())->setName('Dozen')->setEachEquivalent(12)->setPackageUnit(false);
+        $this->tray = (new Unit())->setName('Tray')->setEachEquivalent(20)->setPackageUnit(false);
         foreach ([$this->user, $this->donuts, $this->cookies, $this->each, $this->dozen, $this->tray] as $entity) {
             $this->entityManager->persist($entity);
         }
@@ -309,7 +309,7 @@ final class ProductionReportControllerTest extends WebTestCase
         foreach ($items as $sortOrder => [$productType, $quantity, $unit, $description]) {
             $order->addItem((new OrderItem())
                 ->setProductType($productType)
-                ->setQuantity($quantity)
+                ->setQuantity((int) $quantity)
                 ->setUnit($unit)
                 ->setDescription($description)
                 ->setSortOrder($sortOrder));

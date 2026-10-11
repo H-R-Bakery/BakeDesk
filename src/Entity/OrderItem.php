@@ -27,8 +27,8 @@ class OrderItem
     private ?ProductType $productType = null;
 
     #[Assert\Positive]
-    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
-    private string $quantity = '0.00';
+    #[ORM\Column]
+    private int $quantity = 1;
 
     #[Assert\NotNull]
     #[ORM\ManyToOne]
@@ -71,12 +71,12 @@ class OrderItem
         return $this;
     }
 
-    public function getQuantity(): string
+    public function getQuantity(): int
     {
         return $this->quantity;
     }
 
-    public function setQuantity(string $quantity): static
+    public function setQuantity(int $quantity): static
     {
         $this->quantity = $quantity;
 

@@ -66,7 +66,7 @@ final class AdminDashboardControllerTest extends WebTestCase
         $this->entityManager->persist($orderTaker);
 
         $productType = (new ProductType())->setName('Donuts');
-        $unit = (new Unit())->setName('Dozen')->setEachEquivalent('10.00');
+        $unit = (new Unit())->setName('Dozen')->setEachEquivalent(10);
         $printer = (new Printer())
             ->setName('Configured printer')
             ->setAddress('ipp://printer.example/print')
@@ -152,7 +152,7 @@ final class AdminDashboardControllerTest extends WebTestCase
             ->setForReports(false);
         $this->entityManager->persist($printer);
         $this->entityManager->persist((new ProductType())->setName('Cookies'));
-        $this->entityManager->persist((new Unit())->setName('Dozen')->setEachEquivalent('10.00'));
+        $this->entityManager->persist((new Unit())->setName('Dozen')->setEachEquivalent(10));
         $this->entityManager->flush();
 
         $this->client->loginUser($this->admin);

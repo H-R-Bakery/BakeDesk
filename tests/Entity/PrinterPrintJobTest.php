@@ -93,11 +93,11 @@ final class PrinterPrintJobTest extends TestCase
             ->setOrderItem($item)
             ->setPackageNumber(2)
             ->setPackageCount(3)
-            ->setPackageQuantity('6');
+            ->setPackageQuantity(6);
 
         self::assertSame($item, $printJob->getOrderItem());
         self::assertSame(2, $printJob->getPackageNumber());
         self::assertSame(3, $printJob->getPackageCount());
-        self::assertSame('6', $printJob->getPackageQuantity());
+        self::assertSame(6, $printJob->getPackageQuantity());
     }
 }

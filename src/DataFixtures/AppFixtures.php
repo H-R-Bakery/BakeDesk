@@ -37,12 +37,12 @@ final class AppFixtures extends Fixture
 
         $units = [];
         foreach ([
-            ['Each', 'ea', 10, false, '1.00'],
+            ['Each', 'ea', 10, false, 1],
             // These values are valid bootstrap values only; the bakery owner must review them in administration.
-            ['Dozen', 'doz', 20, true, '12.00'],
-            ['Half Dozen', '1/2 doz', 30, false, '6.00'],
-            ['Tray', 'tray', 40, true, '20.00'],
-            ['Box', 'box', 50, true, '24.00'],
+            ['Dozen', 'doz', 20, true, 12],
+            ['Half Dozen', '1/2 doz', 30, false, 6],
+            ['Tray', 'tray', 40, true, 20],
+            ['Box', 'box', 50, true, 24],
         ] as [$name, $abbreviation, $sortOrder, $isPackageUnit, $eachEquivalent]) {
             $unit = (new Unit())
                 ->setName($name)
@@ -56,8 +56,8 @@ final class AppFixtures extends Fixture
         }
 
         foreach ([
-            [$productTypes['Donuts'], $units['Each'], '12'],
-            [$productTypes['Cookies'], $units['Each'], '24'],
+            [$productTypes['Donuts'], $units['Each'], 12],
+            [$productTypes['Cookies'], $units['Each'], 24],
         ] as [$productType, $units, $quantityPerPackage]) {
             $manager->persist((new PackagingRule())
                 ->setProductType($productType)
