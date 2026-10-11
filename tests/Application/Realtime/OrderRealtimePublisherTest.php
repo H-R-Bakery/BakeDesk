@@ -6,7 +6,6 @@ namespace App\Tests\Application\Realtime;
 
 use App\Application\Realtime\OrderRealtimePublisher;
 use App\Entity\Order;
-use App\Entity\OrderItem;
 use App\Entity\PrintJob;
 use App\Model\OrderStatus;
 use App\Model\PrintDocumentType;
@@ -50,15 +49,13 @@ final class OrderRealtimePublisherTest extends TestCase
     {
         $order = new Order();
         $this->setId($order, 123);
-        $item = (new OrderItem())->setOrder($order);
-        $this->setId($item, 87);
         $printJob = (new PrintJob())
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus($status)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(2)
             ->setPackageCount(3)
+            ->setLabelSetId('label-set-1')
             ->setErrorMessage(PrintJobStatus::FAILED === $status ? 'Printer unavailable' : null);
         $this->setId($printJob, 456);
         $hub = $this->createMock(HubInterface::class);
@@ -72,9 +69,9 @@ final class OrderRealtimePublisherTest extends TestCase
                 self::assertSame('label', $payload['documentType']);
                 self::assertSame($status->value, $payload['status']);
                 self::assertSame(456, $payload['printJobId']);
-                self::assertSame(87, $payload['orderItemId']);
                 self::assertSame(2, $payload['packageNumber']);
                 self::assertSame(3, $payload['packageCount']);
+                self::assertSame('label-set-1', $payload['labelSetId']);
 
                 return true;
             }))

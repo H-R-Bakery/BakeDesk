@@ -46,7 +46,7 @@ final class PrintJobAdministrationTest extends TestCase
             ->setOrder($order)
             ->setPackageNumber(1)
             ->setPackageCount(2)
-            ->setPackageQuantity(6)
+            ->setPackageSnapshot(['packageNumber' => 1, 'packageCount' => 2, 'lines' => []])
             ->setDocumentPath('labels/2026/10/order-label.pdf')
             ->setAttemptCount(3);
         $id = new \ReflectionProperty(PrintJob::class, 'id');
@@ -61,7 +61,7 @@ final class PrintJobAdministrationTest extends TestCase
         self::assertSame(3, $printJob->getAttemptCount());
         self::assertSame(1, $printJob->getPackageNumber());
         self::assertSame(2, $printJob->getPackageCount());
-        self::assertSame(6, $printJob->getPackageQuantity());
+        self::assertSame(1, $printJob->getPackageSnapshot()['packageNumber']);
     }
 
     #[DataProvider('nonCancellableStatuses')]

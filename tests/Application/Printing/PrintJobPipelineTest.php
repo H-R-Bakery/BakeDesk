@@ -175,9 +175,9 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertCount(2, $printJobs);
         self::assertSame([1, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageNumber(), $printJobs));
         self::assertSame([2, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageCount(), $printJobs));
-        self::assertSame([1, 1], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageQuantity(), $printJobs));
-        self::assertSame([1, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getOrderPackageNumber(), $printJobs));
-        self::assertSame([2, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getOrderPackageCount(), $printJobs));
+        self::assertSame([1, 1], array_map(static fn (PrintJob $printJob): int => $printJob->getPackageSnapshot()['lines'][0]['quantity'], $printJobs));
+        self::assertSame([1, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageNumber(), $printJobs));
+        self::assertSame([2, 2], array_map(static fn (PrintJob $printJob): ?int => $printJob->getPackageCount(), $printJobs));
         self::assertSame(array_map(static fn (PrintJob $printJob): ?int => $printJob->getId(), $printJobs), $dispatchedJobIds);
         foreach ($printJobs as $printJob) {
             self::assertNotNull($printJob->getId());
@@ -190,6 +190,43 @@ final class PrintJobPipelineTest extends KernelTestCase
         }
     }
 
+    public function testCreatorCreatesTwoJobsForCompatibleDonutLinesAndCookies(): void
+    {
+        $this->createDefaultPrinter();
+        $order = $this->createOrder();
+        $donutItem = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $donutItem);
+        $donutUnit = $donutItem->getUnit();
+        $donutProduct = $donutItem->getProductType();
+        self::assertNotNull($donutUnit);
+        self::assertNotNull($donutProduct);
+        $donutUnit->setName('Each')->setPackageUnit(false);
+        $donutItem->setQuantity(1)->setDescription('Glazed');
+        $order->addItem((new OrderItem())->setProductType($donutProduct)->setUnit($donutUnit)->setQuantity(1)->setDescription('Iced')->setSortOrder(10));
+
+        $cookieProduct = (new ProductType())->setName('Cookies');
+        $cookieUnit = (new Unit())->setName('Each');
+        $order->addItem((new OrderItem())->setProductType($cookieProduct)->setUnit($cookieUnit)->setQuantity(3)->setDescription('Chocolate Chip')->setSortOrder(20));
+        $this->entityManager->persist($cookieProduct);
+        $this->entityManager->persist($cookieUnit);
+        $this->entityManager->persist((new PackagingRule())->setProductType($donutProduct)->setUnit($donutUnit)->setQuantityPerPackage(12));
+        $this->entityManager->persist((new PackagingRule())->setProductType($cookieProduct)->setUnit($cookieUnit)->setQuantityPerPackage(24));
+        $this->entityManager->flush();
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(2))->method('dispatch')->with(self::isInstanceOf(ProcessPrintJob::class))->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $creator = new LabelPrintJobCreator($this->entityManager, $this->printJobRepository, new LabelPrinterResolver($this->printerRepository), self::getContainer()->get(OrderPackageCalculator::class), $bus);
+
+        $printJobs = $creator->createAndDispatch($order);
+
+        self::assertCount(2, $printJobs);
+        self::assertCount(2, $printJobs[0]->getPackageSnapshot()['lines']);
+        self::assertSame([1, 1], array_map(static fn (array $line): int => $line['quantity'], $printJobs[0]->getPackageSnapshot()['lines']));
+        self::assertSame(3, $printJobs[1]->getPackageSnapshot()['lines'][0]['quantity']);
+        self::assertSame([1, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $printJobs));
+        self::assertSame([2, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
+    }
+
     public function testHandlerRendersStoresLogicalPathAndSubmitsOnce(): void
     {
         $this->createDefaultPrinter();
@@ -198,7 +235,11 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setPrinter($this->printerRepository->findConfiguredLabelDefaults()[0])
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::QUEUED)
-            ->setOrder($order);
+            ->setOrder($order)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageSnapshot($this->snapshot($order, 1, 1))
+            ->setLabelSetId('label-set-1');
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
 
@@ -207,7 +248,7 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->expects(self::once())
             ->method('write')
             ->with(
-                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#'),
+                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}-box-1-of-1-print-job-\d+\.pdf$#'),
                 '%PDF-1.7 test label',
             );
         $pdfRenderer = $this->createStub(DocumentRendererInterface::class);
@@ -226,8 +267,8 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->method('submitPdf')
             ->with(
                 self::isInstanceOf(Printer::class),
-                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#'),
-                'BakeDesk Order #1234',
+                self::matchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}-box-1-of-1-print-job-\d+\.pdf$#'),
+                'BakeDesk Order #1234 Box 1 of 1',
             )
             ->willReturn(new PrintSubmission('42', new PrintJobStatusSnapshot(PrintJobState::PENDING)));
         $messageBus = $this->createMock(MessageBusInterface::class);
@@ -253,7 +294,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertInstanceOf(PrintJob::class, $stored);
         self::assertSame(PrintJobStatus::SUBMITTED, $stored->getStatus());
         self::assertSame(1, $stored->getAttemptCount());
-        self::assertMatchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}\.pdf$#', (string) $stored->getDocumentPath());
+        self::assertMatchesRegularExpression('#^labels/2026/10/order-1234-[0-9]{10}-box-1-of-1-print-job-\d+\.pdf$#', (string) $stored->getDocumentPath());
         self::assertNotNull($stored->getSubmittedAt());
         self::assertSame('42', $stored->getExternalJobId());
         self::assertNull($stored->getCompletedAt());
@@ -282,12 +323,10 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::QUEUED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(2)
-            ->setPackageQuantity(1)
-            ->setOrderPackageNumber(2)
-            ->setOrderPackageCount(3);
+            ->setPackageSnapshot($this->snapshot($order, 1, 2))
+            ->setLabelSetId('label-set-1');
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
         $printJobId = $printJob->getId();
@@ -302,7 +341,7 @@ final class PrintJobPipelineTest extends KernelTestCase
         });
         $storage = $this->createMock(FilesystemOperator::class);
         $storage->expects(self::once())->method('write')->with(
-            self::matchesRegularExpression('#item-\d+-box-1-of-2-print-job-'.$printJobId.'\.pdf$#'),
+            self::matchesRegularExpression('#order-1234-[0-9]{10}-box-1-of-2-print-job-'.$printJobId.'\.pdf$#'),
             '%PDF-1.7 test package label',
         );
         $labelRenderer = new OrderLabelRenderer(
@@ -315,8 +354,8 @@ final class PrintJobPipelineTest extends KernelTestCase
         $printerClient = $this->createMock(PrinterClientInterface::class);
         $printerClient->expects(self::once())->method('submitPdf')->with(
             $printer,
-            self::matchesRegularExpression('#item-\d+-box-1-of-2-print-job-'.$printJobId.'\.pdf$#'),
-            'BakeDesk Order #1234 Box 2 of 3',
+            self::matchesRegularExpression('#order-1234-[0-9]{10}-box-1-of-2-print-job-'.$printJobId.'\.pdf$#'),
+            'BakeDesk Order #1234 Box 1 of 2',
         )->willReturn(new PrintSubmission('42', new PrintJobStatusSnapshot(PrintJobState::PENDING)));
         $messageBus = $this->createMock(MessageBusInterface::class);
         $messageBus->expects(self::once())
@@ -335,7 +374,7 @@ final class PrintJobPipelineTest extends KernelTestCase
             $this->createStub(LoggerInterface::class),
         ))(new ProcessPrintJob($printJobId));
 
-        self::assertStringContainsString('BOX 2 OF 3', $renderedHtml);
+        self::assertStringContainsString('BOX 1 OF 2', $renderedHtml);
         self::assertStringContainsString('-print-job-'.$printJobId, (string) $printJob->getDocumentPath());
     }
 
@@ -521,13 +560,12 @@ final class PrintJobPipelineTest extends KernelTestCase
 
         self::assertCount(3, $printJobs);
         self::assertSame($printer, $printJobs[0]->getPrinter());
-        self::assertSame([1, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $printJobs));
-        self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
-        self::assertSame([1, 1, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $printJobs));
-        self::assertSame([1, 2, 3], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageNumber(), $printJobs));
-        self::assertSame([3, 3, 3], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageCount(), $printJobs));
-        self::assertSame($order->getItems()->toArray()[0], $printJobs[0]->getOrderItem());
-        self::assertSame($order->getItems()->toArray()[1], $printJobs[2]->getOrderItem());
+        self::assertSame([1, 2, 3], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $printJobs));
+        self::assertSame([3, 3, 3], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
+        self::assertSame([1, 1, 1], array_map(static fn (PrintJob $job): int => $job->getPackageSnapshot()['lines'][0]['quantity'], $printJobs));
+        self::assertNotNull($printJobs[0]->getLabelSetId());
+        self::assertSame($printJobs[0]->getLabelSetId(), $printJobs[1]->getLabelSetId());
+        self::assertSame($printJobs[0]->getLabelSetId(), $printJobs[2]->getLabelSetId());
     }
 
     public function testCreatorStoresRuleBasedPartialPackageQuantities(): void
@@ -570,11 +608,9 @@ final class PrintJobPipelineTest extends KernelTestCase
         $printJobs = $creator->createAndDispatch($order);
         $ruleJobs = array_slice($printJobs, -2);
 
-        self::assertSame([24, 6], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $ruleJobs));
-        self::assertSame([1, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $ruleJobs));
-        self::assertSame([2, 2], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $ruleJobs));
-        self::assertSame([3, 4], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageNumber(), $ruleJobs));
-        self::assertSame([4, 4], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageCount(), $ruleJobs));
+        self::assertSame([24, 6], array_map(static fn (PrintJob $job): int => $job->getPackageSnapshot()['lines'][0]['quantity'], $ruleJobs));
+        self::assertSame([3, 4], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $ruleJobs));
+        self::assertSame([4, 4], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $ruleJobs));
     }
 
     public function testFullReprintCreatesASeparateCurrentNumberingSnapshotAfterAnEdit(): void
@@ -604,11 +640,11 @@ final class PrintJobPipelineTest extends KernelTestCase
         $this->entityManager->flush();
         $currentJobs = $creator->createAndDispatch($order);
 
-        self::assertSame([1, 2, 3], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageNumber(), $historicalJobs));
-        self::assertSame([3, 3, 3], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageCount(), $historicalJobs));
-        self::assertSame([1, 2, 3, 4], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageNumber(), $currentJobs));
-        self::assertSame([4, 4, 4, 4], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageCount(), $currentJobs));
-        self::assertSame([1, 2, 3], array_map(static fn (PrintJob $job): ?int => $job->getOrderPackageNumber(), $historicalJobs));
+        self::assertSame([1, 2, 3], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $historicalJobs));
+        self::assertSame([3, 3, 3], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $historicalJobs));
+        self::assertSame([1, 2, 3, 4], array_map(static fn (PrintJob $job): ?int => $job->getPackageNumber(), $currentJobs));
+        self::assertSame([4, 4, 4, 4], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $currentJobs));
+        self::assertNotSame($historicalJobs[0]->getLabelSetId(), $currentJobs[0]->getLabelSetId());
     }
 
     public function testRetryWithRenderedDocumentCreatesNewRenderedJobAndPreservesFailedJob(): void
@@ -622,16 +658,16 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
-            ->setOrderItem($orderItem)
             ->setPackageNumber(1)
             ->setPackageCount(2)
-                ->setPackageQuantity(1)
-            ->setOrderPackageNumber(2)
-            ->setOrderPackageCount(4)
+            ->setPackageSnapshot($this->snapshot($order, 1, 2))
+            ->setLabelSetId('label-set-old')
             ->setDocumentPath('labels/2026/10/failed-label.pdf')
             ->setExternalJobId('old-ipp-job')
             ->setErrorMessage('Printer rejected the document.');
         $this->entityManager->persist($failedJob);
+        $this->entityManager->flush();
+        $orderItem->setDescription('Changed after queueing');
         $this->entityManager->flush();
 
         $messageBus = $this->createMock(MessageBusInterface::class);
@@ -647,12 +683,10 @@ final class PrintJobPipelineTest extends KernelTestCase
         self::assertSame(PrintJobStatus::RENDERED, $retry->getStatus());
         self::assertSame($printer, $retry->getPrinter());
         self::assertSame($failedJob->getOrder(), $retry->getOrder());
-        self::assertSame($failedJob->getOrderItem(), $retry->getOrderItem());
         self::assertSame($failedJob->getPackageNumber(), $retry->getPackageNumber());
         self::assertSame($failedJob->getPackageCount(), $retry->getPackageCount());
-        self::assertSame($failedJob->getPackageQuantity(), $retry->getPackageQuantity());
-        self::assertSame(2, $retry->getOrderPackageNumber());
-        self::assertSame(4, $retry->getOrderPackageCount());
+        self::assertSame($failedJob->getPackageSnapshot(), $retry->getPackageSnapshot());
+        self::assertSame('label-set-old', $retry->getLabelSetId());
         self::assertSame($failedJob->getDocumentPath(), $retry->getDocumentPath());
         self::assertNull($retry->getExternalJobId());
         self::assertSame(0, $retry->getAttemptCount());
@@ -671,6 +705,10 @@ final class PrintJobPipelineTest extends KernelTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageSnapshot($this->snapshot($order, 1, 1))
+            ->setLabelSetId('label-set-queued')
             ->setDocumentPath(null);
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
@@ -752,7 +790,11 @@ final class PrintJobPipelineTest extends KernelTestCase
         $printJob = (new PrintJob())
             ->setPrinter($this->printerRepository->findConfiguredLabelDefaults()[0])
             ->setDocumentType(PrintDocumentType::LABEL)
-            ->setOrder($order);
+            ->setOrder($order)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageSnapshot($this->snapshot($order, 1, 1))
+            ->setLabelSetId('label-set-failure');
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
 
@@ -988,5 +1030,26 @@ final class PrintJobPipelineTest extends KernelTestCase
         $this->entityManager->flush();
 
         return $order;
+    }
+
+    /** @return array{packageNumber: int, packageCount: int, lines: list<array{orderItemId: int|null, quantity: int, unitName: string, productTypeName: string, description: string}>} */
+    private function snapshot(Order $order, int $packageNumber, int $packageCount): array
+    {
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        self::assertNotNull($item->getUnit());
+        self::assertNotNull($item->getProductType());
+
+        return [
+            'packageNumber' => $packageNumber,
+            'packageCount' => $packageCount,
+            'lines' => [[
+                'orderItemId' => $item->getId(),
+                'quantity' => 1,
+                'unitName' => $item->getUnit()->getName(),
+                'productTypeName' => $item->getProductType()->getName(),
+                'description' => $item->getDescription(),
+            ]],
+        ];
     }
 }

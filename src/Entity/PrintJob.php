@@ -14,7 +14,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(name: 'idx_print_job_created_at', columns: ['created_at'])]
 #[ORM\Index(name: 'idx_print_job_printer', columns: ['printer_id'])]
 #[ORM\Index(name: 'idx_print_job_order', columns: ['order_id'])]
-#[ORM\Index(name: 'idx_print_job_order_item', columns: ['order_item_id'])]
+#[ORM\Index(name: 'idx_print_job_label_set', columns: ['label_set_id'])]
 class PrintJob
 {
     #[ORM\Id]
@@ -39,10 +39,6 @@ class PrintJob
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
     private ?Order $order = null;
 
-    #[ORM\ManyToOne]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
-    private ?OrderItem $orderItem = null;
-
     #[Assert\Positive]
     #[ORM\Column(nullable: true)]
     private ?int $packageNumber = null;
@@ -51,17 +47,12 @@ class PrintJob
     #[ORM\Column(nullable: true)]
     private ?int $packageCount = null;
 
-    #[Assert\Positive]
-    #[ORM\Column(nullable: true)]
-    private ?int $packageQuantity = null;
+    /** @var array<string, mixed>|null */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $packageSnapshot = null;
 
-    #[Assert\Positive]
-    #[ORM\Column(nullable: true)]
-    private ?int $orderPackageNumber = null;
-
-    #[Assert\Positive]
-    #[ORM\Column(nullable: true)]
-    private ?int $orderPackageCount = null;
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $labelSetId = null;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $reportDate = null;
@@ -149,18 +140,6 @@ class PrintJob
         return $this;
     }
 
-    public function getOrderItem(): ?OrderItem
-    {
-        return $this->orderItem;
-    }
-
-    public function setOrderItem(?OrderItem $orderItem): static
-    {
-        $this->orderItem = $orderItem;
-
-        return $this;
-    }
-
     public function getPackageNumber(): ?int
     {
         return $this->packageNumber;
@@ -185,38 +164,28 @@ class PrintJob
         return $this;
     }
 
-    public function getPackageQuantity(): ?int
+    /** @return array<string, mixed>|null */
+    public function getPackageSnapshot(): ?array
     {
-        return $this->packageQuantity;
+        return $this->packageSnapshot;
     }
 
-    public function setPackageQuantity(?int $packageQuantity): static
+    /** @param array<string, mixed>|null $packageSnapshot */
+    public function setPackageSnapshot(?array $packageSnapshot): static
     {
-        $this->packageQuantity = $packageQuantity;
+        $this->packageSnapshot = $packageSnapshot;
 
         return $this;
     }
 
-    public function getOrderPackageNumber(): ?int
+    public function getLabelSetId(): ?string
     {
-        return $this->orderPackageNumber;
+        return $this->labelSetId;
     }
 
-    public function setOrderPackageNumber(?int $orderPackageNumber): static
+    public function setLabelSetId(?string $labelSetId): static
     {
-        $this->orderPackageNumber = $orderPackageNumber;
-
-        return $this;
-    }
-
-    public function getOrderPackageCount(): ?int
-    {
-        return $this->orderPackageCount;
-    }
-
-    public function setOrderPackageCount(?int $orderPackageCount): static
-    {
-        $this->orderPackageCount = $orderPackageCount;
+        $this->labelSetId = $labelSetId;
 
         return $this;
     }

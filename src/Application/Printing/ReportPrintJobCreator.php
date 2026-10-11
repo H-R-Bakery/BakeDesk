@@ -35,10 +35,10 @@ final class ReportPrintJobCreator
                 ->setDocumentType(PrintDocumentType::REPORT)
                 ->setStatus(PrintJobStatus::QUEUED)
                 ->setOrder(null)
-                ->setOrderItem(null)
                 ->setPackageNumber(null)
                 ->setPackageCount(null)
-                ->setPackageQuantity(null)
+                ->setPackageSnapshot(null)
+                ->setLabelSetId(null)
                 ->setReportDate($reportDate)
                 ->setDocumentPath(null)
                 ->setAttemptCount(0);

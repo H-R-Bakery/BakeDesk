@@ -30,7 +30,7 @@ final class PackagingRuleCrudController extends ReferenceCrudController
         yield AssociationField::new('productType', 'Product type')->autocomplete()->setRequired(true);
         yield AssociationField::new('unit', 'Unit')->autocomplete()->setRequired(true);
         yield IntegerField::new('quantityPerPackage', 'Quantity per package')
-            ->setHelp('Optional. Defines how many of this Product Type and Unit fit in one physical package. If no active rule exists, the entire order item is treated as one package.');
+            ->setHelp('Optional. Defines how many compatible lines of this Product Type and Unit fit in one physical package. If no active rule exists, the complete compatible group is one package.');
         yield BooleanField::new('active', 'Active')->renderAsSwitch(Crud::PAGE_INDEX == $pageName ? false : true);
     }
 }

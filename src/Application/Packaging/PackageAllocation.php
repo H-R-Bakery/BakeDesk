@@ -4,53 +4,81 @@ declare(strict_types=1);
 
 namespace App\Application\Packaging;
 
-use App\Entity\OrderItem;
-use App\Entity\Unit;
+use App\Entity\Order;
 
 final readonly class PackageAllocation
 {
-    /**
-     * Order-wide numbering is intentionally absent only while this is the
-     * item-level result produced by PackageCalculator. OrderPackageCalculator
-     * assigns it before an allocation is used for a current label operation.
-     */
+    /** @var list<PackageAllocationLine> */
+    public array $lines;
+
+    /** @param list<mixed> $lines */
     public function __construct(
-        public OrderItem $orderItem,
-        public int $itemPackageNumber,
-        public int $itemPackageCount,
-        public int $quantity,
-        public Unit $unit,
-        public ?int $orderPackageNumber = null,
-        public ?int $orderPackageCount = null,
+        public int $packageNumber,
+        public int $packageCount,
+        array $lines,
+        private ?Order $order = null,
     ) {
-        self::assertValidPosition($itemPackageNumber, $itemPackageCount, 'Item package');
-
-        if ((null === $orderPackageNumber) !== (null === $orderPackageCount)) {
-            throw new \InvalidArgumentException('Order package number and count must be provided together.');
+        self::assertValidPosition($packageNumber, $packageCount);
+        if ([] === $lines) {
+            throw new \InvalidArgumentException('A package allocation must contain at least one line.');
         }
-
-        if (null !== $orderPackageNumber && null !== $orderPackageCount) {
-            self::assertValidPosition($orderPackageNumber, $orderPackageCount, 'Order package');
+        foreach ($lines as $line) {
+            if (!$line instanceof PackageAllocationLine) {
+                throw new \InvalidArgumentException('A package allocation may contain only package allocation lines.');
+            }
         }
+        $this->lines = $lines;
     }
 
-    public function withOrderPackagePosition(int $number, int $count): self
+    public function getOrder(): ?Order
     {
-        return new self(
-            orderItem: $this->orderItem,
-            itemPackageNumber: $this->itemPackageNumber,
-            itemPackageCount: $this->itemPackageCount,
-            quantity: $this->quantity,
-            unit: $this->unit,
-            orderPackageNumber: $number,
-            orderPackageCount: $count,
-        );
+        if (null !== $this->order) {
+            return $this->order;
+        }
+
+        return $this->lines[0]->orderItem->getOrder();
     }
 
-    private static function assertValidPosition(int $number, int $count, string $label): void
+    public function withOrder(Order $order): self
+    {
+        return new self($this->packageNumber, $this->packageCount, $this->lines, $order);
+    }
+
+    /** @return array{packageNumber: int, packageCount: int, lines: list<array{orderItemId: int|null, quantity: int, unitName: string, productTypeName: string, description: string}>} */
+    public function toSnapshot(): array
+    {
+        return [
+            'packageNumber' => $this->packageNumber,
+            'packageCount' => $this->packageCount,
+            'lines' => array_map(static fn (PackageAllocationLine $line): array => $line->toSnapshot(), $this->lines),
+        ];
+    }
+
+    /** @param array<string, mixed> $snapshot */
+    public static function fromSnapshot(array $snapshot, ?Order $order = null): self
+    {
+        $packageNumber = $snapshot['packageNumber'] ?? null;
+        $packageCount = $snapshot['packageCount'] ?? null;
+        $lines = $snapshot['lines'] ?? null;
+        if (!is_int($packageNumber) || !is_int($packageCount) || !is_array($lines)) {
+            throw new \InvalidArgumentException('A package snapshot contains invalid package metadata.');
+        }
+
+        $allocationLines = [];
+        foreach ($lines as $line) {
+            if (!is_array($line)) {
+                throw new \InvalidArgumentException('A package snapshot contains an invalid line.');
+            }
+            $allocationLines[] = PackageAllocationLine::fromSnapshot($line);
+        }
+
+        return new self($packageNumber, $packageCount, $allocationLines, $order);
+    }
+
+    private static function assertValidPosition(int $number, int $count): void
     {
         if ($number < 1 || $count < 1 || $number > $count) {
-            throw new \InvalidArgumentException(sprintf('%s numbers must identify a valid package.', $label));
+            throw new \InvalidArgumentException('Package numbers must identify a valid order-wide package.');
         }
     }
 }

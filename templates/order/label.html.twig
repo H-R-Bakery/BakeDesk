@@ -288,14 +288,16 @@
 
             <div class="items">
                 {% if package %}
-                    {% set item = package.orderItem %}
-                    <article class="item">
-                        <div class="item-heading">
-                            <span class="item-quantity">{{ package.quantity }} {{ package.unit.name }}</span>
-                            <span class="item-product">{{ item.productType.name }}</span>
-                        </div>
-                        <div class="item-description">{{ item.description }}</div>
-                    </article>
+                    {% for line in package.lines %}
+                        {% set item = line.orderItem %}
+                        <article class="item">
+                            <div class="item-heading">
+                                <span class="item-quantity">{{ line.quantity }} {{ line.unit.name }}</span>
+                                <span class="item-product">{{ item.productType.name }}</span>
+                            </div>
+                            <div class="item-description">{{ item.description }}</div>
+                        </article>
+                    {% endfor %}
                 {% else %}
                     {% for item in items %}
                         <article class="item">
@@ -328,7 +330,7 @@
             </div>
 
             <div class="package-count">
-                BOX {{ package ? (package.orderPackageNumber ?? package.itemPackageNumber) : 1 }} OF {{ package ? (package.orderPackageCount ?? package.itemPackageCount) : 1 }}
+                BOX {{ package ? package.packageNumber : 1 }} OF {{ package ? package.packageCount : 1 }}
             </div>
 
             <div class="metadata">

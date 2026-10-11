@@ -10,7 +10,6 @@ use App\Entity\PrintJob;
 use App\Model\OrderStatus;
 use App\Model\PrintJobStatus;
 use Doctrine\DBAL\Types\Types;
-use SortDirection;
 
 /** @extends AbstractServiceEntityRepository<Order> */
 class OrderRepository extends AbstractServiceEntityRepository
@@ -35,8 +34,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->addSelect('COUNT(item.id) AS itemCount')
             ->groupBy('o.id')
             ->addGroupBy('user.id')
-            ->orderBy('o.pickupAt', SortDirection::Ascending)
-            ->addOrderBy('o.orderNumber', SortDirection::Ascending)
+            ->orderBy('o.pickupAt', \SortDirection::Ascending)
+            ->addOrderBy('o.orderNumber', \SortDirection::Ascending)
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize);
 
@@ -88,8 +87,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->select('o.id')
             ->andWhere('o.customer = :customer')
             ->setParameter('customer', $customer)
-            ->orderBy('o.pickupAt', SortDirection::Descending)
-            ->addOrderBy('o.id', SortDirection::Descending)
+            ->orderBy('o.pickupAt', \SortDirection::Descending)
+            ->addOrderBy('o.id', \SortDirection::Descending)
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize)
             ->getQuery()
@@ -110,8 +109,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->addSelect('unit')
             ->andWhere('o.id IN (:orderIds)')
             ->setParameter('orderIds', $orderIds)
-            ->orderBy('o.pickupAt', SortDirection::Descending)
-            ->addOrderBy('o.id', SortDirection::Descending)
+            ->orderBy('o.pickupAt', \SortDirection::Descending)
+            ->addOrderBy('o.id', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
@@ -181,7 +180,7 @@ class OrderRepository extends AbstractServiceEntityRepository
     {
         return $this->createCleanupQueryBuilder($cutoff)
             ->select('DISTINCT bakeryOrder')
-            ->orderBy('bakeryOrder.id', SortDirection::Ascending)
+            ->orderBy('bakeryOrder.id', \SortDirection::Ascending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -205,12 +204,12 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->setParameter('start', $start, Types::DATETIME_IMMUTABLE)
             ->setParameter('end', $end, Types::DATETIME_IMMUTABLE)
             ->setParameter('includedStatuses', [OrderStatus::OPEN->value, OrderStatus::COMPLETED->value])
-            ->orderBy('productType.sortOrder', SortDirection::Ascending)
-            ->addOrderBy('productType.name', SortDirection::Ascending)
-            ->addOrderBy('o.pickupAt', SortDirection::Ascending)
-            ->addOrderBy('o.orderNumber', SortDirection::Ascending)
-            ->addOrderBy('item.sortOrder', SortDirection::Ascending)
-            ->addOrderBy('item.id', SortDirection::Ascending)
+            ->orderBy('productType.sortOrder', \SortDirection::Ascending)
+            ->addOrderBy('productType.name', \SortDirection::Ascending)
+            ->addOrderBy('o.pickupAt', \SortDirection::Ascending)
+            ->addOrderBy('o.orderNumber', \SortDirection::Ascending)
+            ->addOrderBy('item.sortOrder', \SortDirection::Ascending)
+            ->addOrderBy('item.id', \SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }
@@ -271,8 +270,7 @@ class OrderRepository extends AbstractServiceEntityRepository
         $printJobReferenceQuery = $this->getEntityManager()->createQueryBuilder()
             ->select('referencedPrintJob.id')
             ->from(PrintJob::class, 'referencedPrintJob')
-            ->leftJoin('referencedPrintJob.orderItem', 'referencedOrderItem')
-            ->where('(referencedPrintJob.order = bakeryOrder OR referencedOrderItem.order = bakeryOrder)');
+            ->where('referencedPrintJob.order = bakeryOrder');
 
         if (null !== $printJobCutoff) {
             $printJobReferenceQuery

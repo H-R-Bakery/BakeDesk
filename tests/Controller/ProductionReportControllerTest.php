@@ -222,10 +222,9 @@ final class ProductionReportControllerTest extends WebTestCase
         self::assertSame('2026-10-09', $printJob->getReportDate()?->format('Y-m-d'));
         self::assertSame($printer->getId(), $printJob->getPrinter()?->getId());
         self::assertNull($printJob->getOrder());
-        self::assertNull($printJob->getOrderItem());
         self::assertNull($printJob->getPackageNumber());
         self::assertNull($printJob->getPackageCount());
-        self::assertNull($printJob->getPackageQuantity());
+        self::assertNull($printJob->getPackageSnapshot());
         self::assertNull($printJob->getDocumentPath());
     }
 

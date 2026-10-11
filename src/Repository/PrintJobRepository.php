@@ -7,7 +7,6 @@ use App\Entity\PrintJob;
 use App\Model\PrintDocumentType;
 use App\Model\PrintJobStatus;
 use Doctrine\DBAL\Types\Types;
-use SortDirection;
 
 /** @extends AbstractServiceEntityRepository<PrintJob> */
 class PrintJobRepository extends AbstractServiceEntityRepository
@@ -24,8 +23,8 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->andWhere('printJob.documentType = :documentType')
             ->setParameter('order', $order)
             ->setParameter('documentType', PrintDocumentType::LABEL)
-            ->orderBy('printJob.createdAt', SortDirection::Descending)
-            ->addOrderBy('printJob.id', SortDirection::Descending)
+            ->orderBy('printJob.createdAt', \SortDirection::Descending)
+            ->addOrderBy('printJob.id', \SortDirection::Descending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -70,7 +69,7 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->andWhere('printJob.createdAt < :cutoff')
             ->setParameter('terminalStatuses', $this->terminalStatusValues())
             ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
-            ->orderBy('printJob.id', SortDirection::Ascending)
+            ->orderBy('printJob.id', \SortDirection::Ascending)
             ->setMaxResults($limit);
 
         if (null === $documentPath) {
@@ -96,7 +95,7 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->andWhere('printJob.createdAt < :cutoff')
             ->setParameter('terminalStatuses', $this->terminalStatusValues())
             ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
-            ->orderBy('printJob.documentPath', SortDirection::Ascending)
+            ->orderBy('printJob.documentPath', \SortDirection::Ascending)
             ->setFirstResult($offset)
             ->setMaxResults($limit)
             ->getQuery()
@@ -150,14 +149,14 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->andWhere('printJob.documentType = :documentType')
             ->setParameter('order', $order)
             ->setParameter('documentType', PrintDocumentType::LABEL)
-            ->orderBy('printJob.createdAt', SortDirection::Descending)
-            ->addOrderBy('printJob.id', SortDirection::Descending)
+            ->orderBy('printJob.createdAt', \SortDirection::Descending)
+            ->addOrderBy('printJob.id', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
 
     /**
-     * @return array<string, PrintJob>
+     * @return array<int, PrintJob>
      */
     public function findLatestLabelJobsByPackageForOrder(Order $order): array
     {
@@ -165,30 +164,28 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->select('1')
             ->andWhere('newer.order = :order')
             ->andWhere('newer.documentType = :documentType')
-            ->andWhere('newer.orderItem = printJob.orderItem')
             ->andWhere('newer.packageNumber = printJob.packageNumber')
             ->andWhere('(newer.createdAt > printJob.createdAt OR (newer.createdAt = printJob.createdAt AND newer.id > printJob.id))');
 
         $jobs = $this->createQueryBuilder('printJob')
             ->andWhere('printJob.order = :order')
             ->andWhere('printJob.documentType = :documentType')
-            ->andWhere('printJob.orderItem IS NOT NULL')
             ->andWhere('printJob.packageNumber IS NOT NULL')
             ->andWhere($this->getEntityManager()->getExpressionBuilder()->not($this->getEntityManager()->getExpressionBuilder()->exists($latestJob->getDQL())))
             ->setParameter('order', $order)
             ->setParameter('documentType', PrintDocumentType::LABEL)
-            ->orderBy('printJob.createdAt', SortDirection::Descending)
-            ->addOrderBy('printJob.id', SortDirection::Descending)
+            ->orderBy('printJob.createdAt', \SortDirection::Descending)
+            ->addOrderBy('printJob.id', \SortDirection::Descending)
             ->getQuery()
             ->getResult();
 
+        /** @var array<int, PrintJob> $latestByPackage */
         $latestByPackage = [];
         foreach ($jobs as $job) {
             \assert($job instanceof PrintJob);
-            $orderItemId = $job->getOrderItem()?->getId();
             $packageNumber = $job->getPackageNumber();
-            if (null !== $orderItemId && null !== $packageNumber) {
-                $latestByPackage[$orderItemId.':'.$packageNumber] = $job;
+            if (null !== $packageNumber) {
+                $latestByPackage[$packageNumber] = $job;
             }
         }
 

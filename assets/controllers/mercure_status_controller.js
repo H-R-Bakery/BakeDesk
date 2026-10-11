@@ -94,13 +94,12 @@ export default class MercureStatusController extends Controller {
         if (!Number.isInteger(payload.printJobId) || !statusLabels[payload.status]) {
             return;
         }
-        if (!Number.isInteger(payload.orderItemId) || !Number.isInteger(payload.packageNumber)) {
+        if (!Number.isInteger(payload.packageNumber)) {
             return;
         }
 
         const packageElement = Array.from(this.element.querySelectorAll('[data-role="package-print-status"]'))
-            .find((element) => element.dataset.orderItemId === String(payload.orderItemId)
-                && element.dataset.packageNumber === String(payload.packageNumber));
+            .find((element) => element.dataset.packageNumber === String(payload.packageNumber));
         if (!packageElement) {
             return;
         }

@@ -6,6 +6,7 @@ namespace App\Application\Document;
 
 use App\Application\Order\BakeryClock;
 use App\Application\Packaging\PackageAllocation;
+use App\Application\Packaging\PackageAllocationLine;
 use App\Entity\Order;
 use App\Entity\OrderItem;
 use League\Flysystem\FilesystemOperator;
@@ -32,14 +33,14 @@ final class OrderLabelRenderer
 
     public function render(Order|PackageAllocation $subject, ?int $printJobId = null): RenderedDocument
     {
-        $order = $subject instanceof PackageAllocation ? $subject->orderItem->getOrder() : $subject;
+        $order = $subject instanceof PackageAllocation ? $subject->getOrder() : $subject;
         if (null === $order) {
             throw new \LogicException('A package label requires an order.');
         }
 
         try {
             $package = $subject instanceof PackageAllocation ? $subject : null;
-            $items = null === $package ? $this->sortedItems($order) : [$package->orderItem];
+            $items = null === $package ? $this->sortedItems($order) : [];
             $this->assertItemsFit($items, $package);
             $html = $this->twig->render('order/label.html.twig', [
                 'order' => $order,
@@ -58,13 +59,12 @@ final class OrderLabelRenderer
             $filename = null === $package
                 ? sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), $this->safePhoneNumber($order))
                 : sprintf(
-                    'order-%s-%s-item-%s-box-%d-of-%d%s.pdf',
+                    'order-%s-%s-box-%d-of-%d%s.pdf',
                     $this->safeOrderNumber($order),
                     $this->safePhoneNumber($order),
-                    $this->safeItemKey($package->orderItem),
-                    $package->itemPackageNumber,
-                    $package->itemPackageCount,
-                    null === $printJobId ? '' : '-print-job-'.$printJobId,
+                    $package->packageNumber,
+                    $package->packageCount,
+                    null === $printJobId ? '-preview' : '-print-job-'.$printJobId,
                 );
             $path = sprintf(
                 'labels/%s/%s/%s',
@@ -104,14 +104,16 @@ final class OrderLabelRenderer
     private function assertItemsFit(array $items, ?PackageAllocation $package = null): void
     {
         $lineCount = 0;
-        foreach ($items as $item) {
-            $quantity = null !== $package ? $package->quantity : $item->getQuantity();
-            $unit = null !== $package ? $package->unit : $item->getUnit();
-            $heading = sprintf('%s %s %s', $quantity, $unit?->getName() ?? '', $item->getProductType()?->getName() ?? '');
-            $lineCount += max(1, (int) ceil(mb_strlen($heading) / 42));
-            $lineCount += max(1, (int) ceil(mb_strlen($item->getDescription()) / 30));
+        if (null !== $package) {
+            foreach ($package->lines as $line) {
+                $lineCount += $this->lineHeight($line);
+            }
+        } else {
+            foreach ($items as $item) {
+                $lineCount += $this->lineHeight($this->lineForItem($item));
+            }
         }
-        if (null !== $package && $package->itemPackageCount > 1) {
+        if (null !== $package && $package->packageCount > 1) {
             ++$lineCount;
         }
 
@@ -147,9 +149,22 @@ final class OrderLabelRenderer
         return trim($safePhoneNumber);
     }
 
-    private function safeItemKey(OrderItem $item): string
+    private function lineHeight(PackageAllocationLine $line): int
     {
-        return (string) ($item->getId() ?? $item->getSortOrder());
+        $item = $line->orderItem;
+        $heading = sprintf('%s %s %s', $line->quantity, $line->unit->getName(), $item->getProductType()?->getName() ?? '');
+
+        return max(1, (int) ceil(mb_strlen($heading) / 42)) + max(1, (int) ceil(mb_strlen($item->getDescription()) / 30));
+    }
+
+    private function lineForItem(OrderItem $item): PackageAllocationLine
+    {
+        $unit = $item->getUnit();
+        if (null === $unit) {
+            throw new \LogicException('An order label item requires a unit.');
+        }
+
+        return new PackageAllocationLine($item, $item->getQuantity(), $unit);
     }
 
     private function asBakeryLocalDateTime(?\DateTimeImmutable $dateTime): ?\DateTimeImmutable

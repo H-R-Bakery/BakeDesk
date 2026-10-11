@@ -192,31 +192,28 @@ final class ProcessPrintJobHandler
         $this->publishStatus($printJob);
     }
 
-    private function labelSubject(PrintJob $printJob): \App\Entity\Order|PackageAllocation
+    private function labelSubject(PrintJob $printJob): PackageAllocation
     {
         $order = $printJob->getOrder();
         if (null === $order) {
             throw new \LogicException('A label print job requires an order.');
         }
 
-        $orderItem = $printJob->getOrderItem();
-        if (null === $orderItem && null === $printJob->getPackageNumber() && null === $printJob->getPackageCount() && null === $printJob->getPackageQuantity()) {
-            return $order;
-        }
-
-        if (null === $orderItem || null === $printJob->getPackageNumber() || null === $printJob->getPackageCount() || null === $printJob->getPackageQuantity() || null === $orderItem->getUnit()) {
+        if (null === $printJob->getPackageNumber() || null === $printJob->getPackageCount()) {
             throw new \LogicException('A package label print job requires complete package metadata.');
         }
 
-        return new PackageAllocation(
-            orderItem: $orderItem,
-            itemPackageNumber: $printJob->getPackageNumber(),
-            itemPackageCount: $printJob->getPackageCount(),
-            quantity: $printJob->getPackageQuantity(),
-            unit: $orderItem->getUnit(),
-            orderPackageNumber: $printJob->getOrderPackageNumber(),
-            orderPackageCount: $printJob->getOrderPackageCount(),
-        );
+        $snapshot = $printJob->getPackageSnapshot();
+        if (null === $snapshot) {
+            throw new \LogicException('A label print job requires a package snapshot.');
+        }
+
+        $allocation = PackageAllocation::fromSnapshot($snapshot, $order);
+        if ($allocation->packageNumber !== $printJob->getPackageNumber() || $allocation->packageCount !== $printJob->getPackageCount()) {
+            throw new \LogicException('A label print job has inconsistent package metadata.');
+        }
+
+        return $allocation;
     }
 
     private function jobName(PrintJob $printJob): string
@@ -233,10 +230,6 @@ final class ProcessPrintJobHandler
         $order = $printJob->getOrder();
         if (null === $order) {
             throw new \LogicException('A label print job requires an order.');
-        }
-
-        if (null !== $printJob->getOrderPackageNumber() && null !== $printJob->getOrderPackageCount()) {
-            return sprintf('%s Order #%s Box %d of %d', $this->bakedeskBrandName, $order->getOrderNumber(), $printJob->getOrderPackageNumber(), $printJob->getOrderPackageCount());
         }
 
         if (null !== $printJob->getPackageNumber() && null !== $printJob->getPackageCount()) {

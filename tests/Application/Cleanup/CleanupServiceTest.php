@@ -171,7 +171,7 @@ final class CleanupServiceTest extends KernelTestCase
         $oldCompletedItemId = $oldCompletedItem->getId();
 
         $orderJob = $this->createPrintJob(PrintJobStatus::QUEUED, $old, null, $referencedOrder);
-        $itemJob = $this->createPrintJob(PrintJobStatus::PROCESSING, $old, null, null, $itemReferencedOrder->getItems()->first());
+        $itemJob = $this->createPrintJob(PrintJobStatus::PROCESSING, $old, null, $itemReferencedOrder);
         $this->entityManager->flush();
         $oldCompletedId = $oldCompleted->getId();
         $oldCancelledId = $oldCancelled->getId();
@@ -207,7 +207,7 @@ final class CleanupServiceTest extends KernelTestCase
     {
         $old = $this->nowUtc()->modify('-100 days');
         $order = $this->createOrder('dry-run-order', $this->nowUtc()->modify('-800 days'), OrderStatus::COMPLETED);
-        $printJob = $this->createPrintJob(PrintJobStatus::COMPLETED, $old, 'labels/dry-run.pdf', $order, $order->getItems()->first());
+        $printJob = $this->createPrintJob(PrintJobStatus::COMPLETED, $old, 'labels/dry-run.pdf', $order);
         $this->entityManager->flush();
         $files = ['labels/dry-run.pdf' => '%PDF-dry-run'];
         $service = $this->cleanup($this->storage($files, 0));
@@ -257,7 +257,6 @@ final class CleanupServiceTest extends KernelTestCase
         \DateTimeImmutable $createdAt,
         ?string $documentPath = null,
         ?Order $order = null,
-        ?OrderItem $orderItem = null,
     ): PrintJob {
         $printJob = (new PrintJob())
             ->setPrinter($this->printer)
@@ -265,8 +264,7 @@ final class CleanupServiceTest extends KernelTestCase
             ->setStatus($status)
             ->setCreatedAt($createdAt)
             ->setDocumentPath($documentPath)
-            ->setOrder($order)
-            ->setOrderItem($orderItem);
+            ->setOrder($order);
         $this->entityManager->persist($printJob);
 
         return $printJob;

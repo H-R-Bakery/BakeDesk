@@ -103,12 +103,9 @@ final class PrintJobCrudController extends AbstractCrudController
         yield ChoiceField::new('status', 'Status');
         yield AssociationField::new('printer', 'Printer');
         yield AssociationField::new('order', 'Order')->formatValue(static fn ($value): string => null === $value ? '' : 'Order '.$value->getOrderNumber());
-        yield AssociationField::new('orderItem', 'Order item');
-        yield IntegerField::new('packageNumber', 'Item package number');
-        yield IntegerField::new('packageCount', 'Item package count');
-        yield IntegerField::new('packageQuantity', 'Package quantity');
-        yield IntegerField::new('orderPackageNumber', 'Order box number');
-        yield IntegerField::new('orderPackageCount', 'Order box count');
+        yield IntegerField::new('packageNumber', 'Box number');
+        yield IntegerField::new('packageCount', 'Box count');
+        yield TextField::new('labelSetId', 'Label set');
         yield IntegerField::new('attemptCount', 'Attempts');
         yield TextField::new('externalJobId', 'External IPP job ID');
         yield TextField::new('documentPath', 'Document path');

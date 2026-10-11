@@ -329,23 +329,31 @@ Labels represent physical packages or boxes, not entire Orders. A Unit marked
 `isPackageUnit` represents one physical package per whole unit; this behavior
 must come from the database flag rather than hard-coded unit names.
 
-Package identity remains item-local: `OrderItem` plus the item's package number
-identifies one allocation for previews, reprints, and latest label-job lookup.
-Physical label wording uses separate order-wide `BOX N OF N` numbering.
-`OrderPackageCalculator` assigns those numbers deterministically after combining
-each item's allocations in `OrderItem.sortOrder`, `OrderItem.id`, and package
-order. LABEL `PrintJob` rows persist the order-wide number and count as the
-historical context that was printed. Failed-job retries preserve that historical
-numbering, while current package and full-set reprints recalculate it from the
-current Order. Editing an Order never mutates prior PrintJobs or rendered
-documents; previously printed labels may become stale, so staff should reprint
-the full set when necessary.
+Packaging is calculated across the whole Order. A physical package may contain
+portions of multiple compatible OrderItems. Compatibility requires the same
+ProductType, Unit, and applicable active PackagingRule/package semantics.
+`OrderPackageCalculator` groups compatible items, fills configured capacity
+sequentially in `OrderItem.sortOrder` and `OrderItem.id` order, and assigns
+order-wide `BOX N OF N` numbering. A `PackageAllocation` represents one
+physical package and contains one or more package-content lines.
+
+Package identity is the current Order plus its order-wide package number.
+Package Units remain explicit physical boundaries: each ordered package Unit
+creates one physical package. Different Units are never combined by production
+conversion. A missing PackagingRule creates one package for the complete
+compatible ProductType/Unit group, with no inferred capacity. LABEL `PrintJob`
+rows persist an immutable JSON package-content snapshot and the physical box
+number/count. Failed-job retries use that historical snapshot; current previews
+and reprints recalculate the current Order. Editing an Order never mutates prior
+PrintJobs or rendered documents; previously printed labels may become stale, so
+staff should reprint the full set when necessary.
 
 `PackagingRule` records are optional. A rule means: “When this ProductType is
 ordered using this Unit, split the quantity into packages of this capacity.”
 Package Units create one package per whole Unit quantity. Non-package Units with
 an active rule are split according to that rule. Non-package Units without an
-active rule default to one package containing the entire OrderItem quantity.
+active rule default to one package containing the entire compatible
+ProductType/Unit group.
 Missing PackagingRules must never prevent label creation. Package allocation
 uses integer division and remainder. Do not introduce PHP floating point for
 quantity calculations. A separate configurable Unit such as `Half Dozen`
@@ -388,8 +396,9 @@ The printed order label tells packing staff how the individual customer's order 
 
 Each physical package receives its own label and its own LABEL `PrintJob`.
 Package allocations are calculated fulfillment data and are not persisted as
-entities. A package `PrintJob` stores nullable package metadata so historical
-whole-order print jobs remain readable.
+entities. A package `PrintJob` stores its order-wide package number/count and an
+immutable display snapshot of every package-content line. Individual package
+operations use the physical order package number rather than OrderItem identity.
 
 Reports must be available for download.
 
@@ -558,7 +567,10 @@ Likely information includes:
 - document type
 - status
 - associated order when applicable
-- associated order item and package number/count/quantity for new package labels
+- associated order and order-wide package number/count for new package labels
+- immutable package-content snapshot for label rendering and safe retry
+- scalar label-set identifier shared by labels created in one full print/reprint
+  operation
 - report parameters when applicable
 - external IPP job identifier when available
 - attempt count

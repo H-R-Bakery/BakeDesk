@@ -53,12 +53,10 @@ final class LabelPrintJobRetryService
                 ->setDocumentType(PrintDocumentType::LABEL)
                 ->setStatus(null !== $documentPath ? PrintJobStatus::RENDERED : PrintJobStatus::QUEUED)
                 ->setOrder($order)
-                ->setOrderItem($failedJob->getOrderItem())
                 ->setPackageNumber($failedJob->getPackageNumber())
                 ->setPackageCount($failedJob->getPackageCount())
-                ->setPackageQuantity($failedJob->getPackageQuantity())
-                ->setOrderPackageNumber($failedJob->getOrderPackageNumber())
-                ->setOrderPackageCount($failedJob->getOrderPackageCount())
+                ->setPackageSnapshot($failedJob->getPackageSnapshot())
+                ->setLabelSetId($failedJob->getLabelSetId())
                 ->setReportDate(null)
                 ->setExternalJobId(null)
                 ->setDocumentPath($documentPath)
@@ -86,29 +84,10 @@ final class LabelPrintJobRetryService
 
     private function validatePackageContext(PrintJob $failedJob): void
     {
-        $hasOrderItem = null !== $failedJob->getOrderItem();
         $hasPackageNumber = null !== $failedJob->getPackageNumber();
         $hasPackageCount = null !== $failedJob->getPackageCount();
-        $hasPackageQuantity = null !== $failedJob->getPackageQuantity();
-        $hasOrderPackageNumber = null !== $failedJob->getOrderPackageNumber();
-        $hasOrderPackageCount = null !== $failedJob->getOrderPackageCount();
-
-        if ($hasOrderPackageNumber !== $hasOrderPackageCount) {
+        if (!$hasPackageNumber || !$hasPackageCount || null === $failedJob->getPackageSnapshot() || null === $failedJob->getLabelSetId()) {
             throw PrintJobRetryException::incompletePackageContext();
         }
-
-        if ($hasOrderItem && $hasPackageNumber && $hasPackageCount && $hasPackageQuantity) {
-            if ($failedJob->getOrderItem()->getOrder() !== $failedJob->getOrder()) {
-                throw PrintJobRetryException::incompletePackageContext();
-            }
-
-            return;
-        }
-
-        if (!$hasOrderItem && !$hasPackageNumber && !$hasPackageCount && !$hasPackageQuantity) {
-            return;
-        }
-
-        throw PrintJobRetryException::incompletePackageContext();
     }
 }

@@ -208,10 +208,9 @@ final class OrderController extends AbstractController
         return $this->redirectToRoute('order_detail', ['id' => $id]);
     }
 
-    #[Route('/orders/{id<\d+>}/labels/{itemId<\d+>}/{packageNumber<\d+>}/reprint', name: 'order_label_package_reprint', methods: ['POST'])]
+    #[Route('/orders/{id<\d+>}/labels/{packageNumber<\d+>}/reprint', name: 'order_label_package_reprint', methods: ['POST'])]
     public function reprintPackageLabel(
         int $id,
-        int $itemId,
         int $packageNumber,
         Request $request,
         OrderRepository $orderRepository,
@@ -222,7 +221,7 @@ final class OrderController extends AbstractController
         if (!$order instanceof Order) {
             throw $this->createNotFoundException();
         }
-        if (!$this->isCsrfTokenValid(sprintf('reprint-package-label-%d-%d-%d', $id, $itemId, $packageNumber), (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid(sprintf('reprint-package-label-%d-%d', $id, $packageNumber), (string) $request->request->get('_token'))) {
             throw new AccessDeniedHttpException('Invalid CSRF token.');
         }
         if (!$this->canPrintLabels($order)) {
@@ -232,7 +231,7 @@ final class OrderController extends AbstractController
         $allocation = null;
         try {
             foreach ($orderPackageCalculator->calculate($order) as $candidate) {
-                if ($candidate->orderItem->getId() === $itemId && $candidate->itemPackageNumber === $packageNumber) {
+                if ($candidate->packageNumber === $packageNumber) {
                     $allocation = $candidate;
                     break;
                 }
@@ -322,8 +321,8 @@ final class OrderController extends AbstractController
         return $response;
     }
 
-    #[Route('/orders/{id<\d+>}/label/{itemId<\d+>}/{packageNumber<\d+>}', name: 'order_label_package', methods: ['GET'])]
-    public function packageLabel(int $id, int $itemId, int $packageNumber, OrderRepository $orderRepository, OrderPackageCalculator $orderPackageCalculator, OrderLabelRenderer $orderLabelRenderer): Response
+    #[Route('/orders/{id<\d+>}/label/{packageNumber<\d+>}', name: 'order_label_package', methods: ['GET'])]
+    public function packageLabel(int $id, int $packageNumber, OrderRepository $orderRepository, OrderPackageCalculator $orderPackageCalculator, OrderLabelRenderer $orderLabelRenderer): Response
     {
         $order = $orderRepository->findForDetail($id);
         if (!$order instanceof Order) {
@@ -333,7 +332,7 @@ final class OrderController extends AbstractController
         try {
             $allocation = null;
             foreach ($orderPackageCalculator->calculate($order) as $candidate) {
-                if ($candidate->orderItem->getId() === $itemId && $candidate->itemPackageNumber === $packageNumber) {
+                if ($candidate->packageNumber === $packageNumber) {
                     $allocation = $candidate;
                     break;
                 }
@@ -548,7 +547,7 @@ final class OrderController extends AbstractController
     }
 
     /**
-     * @return array{latest_label_jobs: array<string, \App\Entity\PrintJob>, package_allocations: list<PackageAllocation>, packaging_error: ?string}
+     * @return array{latest_label_jobs: array<int, \App\Entity\PrintJob>, package_allocations: list<PackageAllocation>, packaging_error: ?string}
      */
     private function labelStatusContext(Order $order, PrintJobRepository $printJobRepository, OrderPackageCalculator $orderPackageCalculator): array
     {
@@ -560,8 +559,17 @@ final class OrderController extends AbstractController
             $packagingError = $exception->getMessage();
         }
 
+        $latestLabelJobs = $printJobRepository->findLatestLabelJobsByPackageForOrder($order);
+        foreach ($packageAllocations as $allocation) {
+            $packageKey = $allocation->packageNumber;
+            $printJob = $latestLabelJobs[$packageKey] ?? null;
+            if (null !== $printJob && $printJob->getPackageSnapshot() !== $allocation->toSnapshot()) {
+                unset($latestLabelJobs[$packageKey]);
+            }
+        }
+
         return [
-            'latest_label_jobs' => $printJobRepository->findLatestLabelJobsByPackageForOrder($order),
+            'latest_label_jobs' => $latestLabelJobs,
             'package_allocations' => $packageAllocations,
             'packaging_error' => $packagingError,
         ];
@@ -569,10 +577,7 @@ final class OrderController extends AbstractController
 
     private function allocationLabel(PackageAllocation $allocation): string
     {
-        $label = sprintf('%s — %s %s', $allocation->orderItem->getProductType()?->getName() ?? 'Package', $allocation->quantity, $allocation->unit->getName());
-        if (null !== $allocation->orderPackageNumber && null !== $allocation->orderPackageCount) {
-            $label .= sprintf(' — Box %d of %d', $allocation->orderPackageNumber, $allocation->orderPackageCount);
-        }
+        $label = sprintf('Box %d of %d', $allocation->packageNumber, $allocation->packageCount);
 
         return $label;
     }

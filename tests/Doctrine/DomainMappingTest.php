@@ -65,15 +65,11 @@ final class DomainMappingTest extends KernelTestCase
         self::assertSame(PrintJobStatus::class, $printJobMetadata->getFieldMapping('status')->enumType);
         self::assertTrue($printJobMetadata->hasField('documentPath'));
         self::assertTrue($printJobMetadata->getFieldMapping('documentPath')->nullable);
-        self::assertTrue($printJobMetadata->hasAssociation('orderItem'));
         self::assertTrue($printJobMetadata->getFieldMapping('packageNumber')->nullable);
         self::assertTrue($printJobMetadata->getFieldMapping('packageCount')->nullable);
-        self::assertTrue($printJobMetadata->getFieldMapping('packageQuantity')->nullable);
-        self::assertSame('integer', $printJobMetadata->getFieldMapping('packageQuantity')->type);
-        self::assertTrue($printJobMetadata->getFieldMapping('orderPackageNumber')->nullable);
-        self::assertTrue($printJobMetadata->getFieldMapping('orderPackageCount')->nullable);
-        self::assertSame('integer', $printJobMetadata->getFieldMapping('orderPackageNumber')->type);
-        self::assertSame('integer', $printJobMetadata->getFieldMapping('orderPackageCount')->type);
+        self::assertTrue($printJobMetadata->getFieldMapping('packageSnapshot')->nullable);
+        self::assertSame('json', $printJobMetadata->getFieldMapping('packageSnapshot')->type);
+        self::assertTrue($printJobMetadata->getFieldMapping('labelSetId')->nullable);
         self::assertSame('date_immutable', $printJobMetadata->getFieldMapping('reportDate')->type);
         self::assertTrue($printJobMetadata->getFieldMapping('reportDate')->nullable);
 

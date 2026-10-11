@@ -42,7 +42,7 @@ final class LabelPrintJobCreator
 
     public function createAllocationAndDispatch(Order $order, PackageAllocation $allocation): PrintJob
     {
-        if ($allocation->orderItem->getOrder() !== $order) {
+        if ($allocation->getOrder() !== $order) {
             throw new \InvalidArgumentException('The package allocation does not belong to the order.');
         }
 
@@ -59,12 +59,13 @@ final class LabelPrintJobCreator
      */
     private function createAndDispatchForAllocations(Order $order, Printer $printer, array $allocations): array
     {
+        $labelSetId = bin2hex(random_bytes(16));
         /** @var list<PrintJob> $printJobs */
-        $printJobs = $this->entityManager->wrapInTransaction(function () use ($order, $printer, $allocations): array {
+        $printJobs = $this->entityManager->wrapInTransaction(function () use ($order, $printer, $allocations, $labelSetId): array {
             $printJobs = [];
             foreach ($allocations as $allocation) {
-                if (null === $allocation->orderPackageNumber || null === $allocation->orderPackageCount) {
-                    throw new \InvalidArgumentException('A label print job requires order-wide package numbering.');
+                if ($allocation->getOrder() !== $order) {
+                    throw new \InvalidArgumentException('Every package allocation must belong to the order.');
                 }
 
                 $printJob = (new PrintJob())
@@ -72,12 +73,10 @@ final class LabelPrintJobCreator
                     ->setDocumentType(PrintDocumentType::LABEL)
                     ->setStatus(PrintJobStatus::QUEUED)
                     ->setOrder($order)
-                    ->setOrderItem($allocation->orderItem)
-                    ->setPackageNumber($allocation->itemPackageNumber)
-                    ->setPackageCount($allocation->itemPackageCount)
-                    ->setPackageQuantity($allocation->quantity)
-                    ->setOrderPackageNumber($allocation->orderPackageNumber)
-                    ->setOrderPackageCount($allocation->orderPackageCount)
+                    ->setPackageNumber($allocation->packageNumber)
+                    ->setPackageCount($allocation->packageCount)
+                    ->setPackageSnapshot($allocation->toSnapshot())
+                    ->setLabelSetId($labelSetId)
                     ->setReportDate(null)
                     ->setAttemptCount(0)
                     ->setDocumentPath(null);

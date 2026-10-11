@@ -8,6 +8,7 @@ use App\Application\Document\DocumentRendererInterface;
 use App\Application\Document\OrderLabelRenderer;
 use App\Application\Order\BakeryClock;
 use App\Application\Packaging\PackageAllocation;
+use App\Application\Packaging\PackageAllocationLine;
 use App\Entity\Customer;
 use App\Entity\Order;
 use App\Entity\OrderItem;
@@ -94,28 +95,33 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('color: #fff;', $renderedHtml);
     }
 
-    public function testPackageLabelContainsOnlyItsAllocatedItemAndBoxPosition(): void
+    public function testPackageLabelContainsEveryAllocatedLineAndBoxPosition(): void
     {
         $order = $this->createOrder();
         $donuts = $order->getItems()->toArray()[1];
-        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit(), 3, 3);
+        $brownies = $order->getItems()->toArray()[0];
+        $allocation = new PackageAllocation(1, 2, [
+            new PackageAllocationLine($donuts, 1, $donuts->getUnit()),
+            new PackageAllocationLine($brownies, 1, $brownies->getUnit()),
+        ], $order);
         $renderedHtml = $this->renderLabel($allocation);
 
         self::assertStringContainsString('1 Dozen', $renderedHtml);
         self::assertStringContainsString('Glazed donuts', $renderedHtml);
-        self::assertStringContainsString('BOX 3 OF 3', $renderedHtml);
-        self::assertStringNotContainsString('Brownies', $renderedHtml);
+        self::assertStringContainsString('1 Box', $renderedHtml);
+        self::assertStringContainsString('No nuts', $renderedHtml);
+        self::assertStringContainsString('BOX 1 OF 2', $renderedHtml);
         self::assertStringContainsString('Snapshot Customer', $renderedHtml);
         self::assertStringContainsString('Order #1234', $renderedHtml);
     }
 
-    public function testLegacyPackageAllocationFallsBackToItemLocalBoxPosition(): void
+    public function testPackageAllocationValidatesItsContents(): void
     {
         $order = $this->createOrder();
         $donuts = $order->getItems()->toArray()[1];
-        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit());
 
-        self::assertStringContainsString('BOX 1 OF 2', $this->renderLabel($allocation));
+        $this->expectException(\InvalidArgumentException::class);
+        new PackageAllocation(1, 1, [], $order);
     }
 
     public function testTooMuchItemContentFailsBeforePdfRendering(): void

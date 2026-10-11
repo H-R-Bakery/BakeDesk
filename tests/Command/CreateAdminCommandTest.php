@@ -36,7 +36,7 @@ final class CreateAdminCommandTest extends KernelTestCase
     {
         $application = new Application(self::getContainer()->get('kernel'));
         $application->setAutoExit(false);
-        $commandTester = new CommandTester($application->find('app:create-admin'));
+        $commandTester = new CommandTester($application->find('bakedesk:create-admin'));
         $commandTester->execute([
             'email' => 'owner@example.test',
             '--password' => 'a very secure password',

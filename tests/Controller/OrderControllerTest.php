@@ -213,7 +213,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('[data-controller="mercure-status"][data-mercure-status-order-id-value="1"]');
         self::assertSelectorTextContains('[data-role="package-print-status"]', 'Queued');
-        self::assertSelectorExists('[data-role="package-print-status"][data-order-item-id="1"][data-package-number="1"]');
+        self::assertSelectorExists('[data-role="package-print-status"][data-package-number="1"]');
     }
 
     public function testMissingPackagingRuleFallsBackToOneLabelAndKeepsPackageUnitLabels(): void
@@ -263,8 +263,8 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(1, $this->entityManager->getRepository(Order::class)->count([]));
         self::assertSame(3, $this->entityManager->getRepository(PrintJob::class)->count([]));
         $printJobs = $this->entityManager->getRepository(PrintJob::class)->findBy([], ['id' => 'ASC']);
-        self::assertSame([1, 1, 24], array_map(static fn (PrintJob $job): ?int => $job->getPackageQuantity(), $printJobs));
-        self::assertSame([2, 2, 1], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
+        self::assertSame([1, 1, 24], array_map(static fn (PrintJob $job): int => $job->getPackageSnapshot()['lines'][0]['quantity'], $printJobs));
+        self::assertSame([3, 3, 3], array_map(static fn (PrintJob $job): ?int => $job->getPackageCount(), $printJobs));
     }
 
     public function testExistingCustomerIsReusedAndNewCustomerIsCreatedWhenNeeded(): void
@@ -430,10 +430,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::COMPLETED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1));
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('history-set'));
         $this->entityManager->flush();
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
@@ -667,10 +667,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::QUEUED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('workflow-set');
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
         $printJobId = $printJob->getId();
@@ -716,8 +716,9 @@ final class OrderControllerTest extends WebTestCase
         self::assertFalse($reopened->isPaid());
         self::assertSame(1, $this->entityManager->getRepository(PrintJob::class)->count([]));
 
-        $this->client->request('GET', '/orders');
-        self::assertSelectorTextContains('#orders-table', '3007');
+        $this->client->request('GET', '/orders/'.$order->getId());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', '3007');
     }
 
     public function testCompletionAndReopeningRequireTheirScopedCsrfTokens(): void
@@ -774,10 +775,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::QUEUED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('payment-set');
         $this->entityManager->persist($printJob);
         $this->entityManager->flush();
         $oldUpdatedAt = $order->getUpdatedAt()?->format('c');
@@ -984,7 +985,7 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
-        $action = sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId());
+        $action = sprintf('/orders/%d/labels/1/reprint', $order->getId());
         $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
         $this->client->request('POST', $action, ['_token' => $token]);
 
@@ -992,12 +993,9 @@ final class OrderControllerTest extends WebTestCase
         $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
         self::assertCount(1, $jobs);
         self::assertSame($printer->getId(), $jobs[0]->getPrinter()?->getId());
-        self::assertSame($item->getId(), $jobs[0]->getOrderItem()?->getId());
         self::assertSame(1, $jobs[0]->getPackageNumber());
         self::assertSame(2, $jobs[0]->getPackageCount());
-        self::assertSame(1, $jobs[0]->getPackageQuantity());
-        self::assertSame(1, $jobs[0]->getOrderPackageNumber());
-        self::assertSame(2, $jobs[0]->getOrderPackageCount());
+        self::assertSame(1, $jobs[0]->getPackageSnapshot()['lines'][0]['quantity']);
         self::assertSame(PrintJobStatus::QUEUED, $jobs[0]->getStatus());
         self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
     }
@@ -1016,7 +1014,7 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
-        $action = sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $items[1]->getId());
+        $action = sprintf('/orders/%d/labels/3/reprint', $order->getId());
         $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
         $this->client->request('POST', $action, ['_token' => $token]);
 
@@ -1024,11 +1022,9 @@ final class OrderControllerTest extends WebTestCase
         $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
         self::assertCount(1, $jobs);
         self::assertSame($printer->getId(), $jobs[0]->getPrinter()?->getId());
-        self::assertSame($items[1]->getId(), $jobs[0]->getOrderItem()?->getId());
-        self::assertSame(1, $jobs[0]->getPackageNumber());
-        self::assertSame(1, $jobs[0]->getPackageCount());
-        self::assertSame(3, $jobs[0]->getOrderPackageNumber());
-        self::assertSame(3, $jobs[0]->getOrderPackageCount());
+        self::assertSame(3, $jobs[0]->getPackageNumber());
+        self::assertSame(3, $jobs[0]->getPackageCount());
+        self::assertSame(1, $jobs[0]->getPackageSnapshot()['lines'][0]['quantity']);
     }
 
     public function testReprintAllCreatesOneNewJobPerCurrentPackage(): void
@@ -1071,10 +1067,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::COMPLETED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('historical-set');
         $this->entityManager->persist($historicalJob);
         $item->setQuantity(2);
         $this->entityManager->flush();
@@ -1091,10 +1087,10 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(2, $jobs[1]->getPackageCount());
         self::assertSame(2, $jobs[2]->getPackageNumber());
         self::assertSame(2, $jobs[2]->getPackageCount());
-        self::assertSame(1, $jobs[1]->getOrderPackageNumber());
-        self::assertSame(2, $jobs[2]->getOrderPackageNumber());
-        self::assertSame(2, $jobs[1]->getOrderPackageCount());
-        self::assertSame(2, $jobs[2]->getOrderPackageCount());
+        self::assertSame(1, $jobs[1]->getPackageNumber());
+        self::assertSame(2, $jobs[2]->getPackageNumber());
+        self::assertSame(2, $jobs[1]->getPackageCount());
+        self::assertSame(2, $jobs[2]->getPackageCount());
         self::assertSame($currentPrinter->getId(), $jobs[1]->getPrinter()?->getId());
         self::assertSame($historicalPrinter->getId(), $historicalJob->getPrinter()?->getId());
         self::assertSame(1, $historicalJob->getPackageCount());
@@ -1115,10 +1111,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1)
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('retry-set')
             ->setDocumentPath('labels/2026/10/order-3023-box-1.pdf')
             ->setExternalJobId(null)
             ->setErrorMessage('Printer did not accept the document.');
@@ -1139,8 +1135,7 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(PrintJobStatus::RENDERED, $retry->getStatus());
         self::assertSame($printer->getId(), $retry->getPrinter()?->getId());
         self::assertSame($failedJob->getDocumentPath(), $retry->getDocumentPath());
-        self::assertNull($retry->getOrderPackageNumber());
-        self::assertNull($retry->getOrderPackageCount());
+        self::assertSame($failedJob->getPackageSnapshot(), $retry->getPackageSnapshot());
         self::assertNull($retry->getExternalJobId());
         self::assertSame(0, $retry->getAttemptCount());
         self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
@@ -1161,10 +1156,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('latest-failed-set');
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
         $completedJob = (new PrintJob())
@@ -1172,10 +1167,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::COMPLETED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1)
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('latest-completed-set')
             ->setCreatedAt($failedJob->getCreatedAt()->modify('+1 second'));
         $this->entityManager->persist($completedJob);
         $this->entityManager->flush();
@@ -1185,6 +1180,36 @@ final class OrderControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('.list-group-item', 'Completed');
         self::assertStringNotContainsString('/print-jobs/'.$failedJob->getId().'/retry', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testPackageStatusDoesNotReuseAStaleSnapshotAfterOrderEdit(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Stale Package Customer', '+18125551234');
+        $order = $this->createOrder('3024', $user, $productType, $unit, $customer);
+        $printer = $this->createDefaultLabelPrinter('Stale package printer');
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+
+        $this->entityManager->persist((new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::COMPLETED)
+            ->setOrder($order)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('stale-package-set'));
+        $item->setDescription('Iced');
+        $this->entityManager->flush();
+
+        $this->client->request('GET', '/orders/'.$order->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.list-group-item', 'Not queued');
+        self::assertSelectorTextContains('.list-group-item', 'Iced');
     }
 
     public function testLabelActionsRequireTheirScopedCsrfTokens(): void
@@ -1202,16 +1227,16 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('csrf-set');
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
 
         $this->client->request('POST', '/orders/'.$order->getId().'/labels/reprint', ['_token' => 'invalid']);
         self::assertResponseStatusCodeSame(403);
-        $this->client->request('POST', sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId()), ['_token' => 'invalid']);
+        $this->client->request('POST', sprintf('/orders/%d/labels/1/reprint', $order->getId()), ['_token' => 'invalid']);
         self::assertResponseStatusCodeSame(403);
         $this->client->request('POST', '/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry', ['_token' => 'invalid']);
         self::assertResponseStatusCodeSame(403);
@@ -1235,22 +1260,22 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($order)
-            ->setOrderItem($item)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($order, 1, 1))
+            ->setLabelSetId('cancelled-set');
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
         $crawler = $this->client->request('GET', '/orders/'.$order->getId());
         $allToken = $crawler->filter('form[action="/orders/'.$order->getId().'/labels/reprint"] input[name="_token"]')->attr('value');
-        $packageToken = $crawler->filter(sprintf('form[action="/orders/%d/labels/%d/1/reprint"] input[name="_token"]', $order->getId(), $item->getId()))->attr('value');
+        $packageToken = $crawler->filter(sprintf('form[action="/orders/%d/labels/1/reprint"] input[name="_token"]', $order->getId()))->attr('value');
         $retryToken = $crawler->filter('form[action="/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry"] input[name="_token"]')->attr('value');
         $order->setStatus(OrderStatus::CANCELLED);
         $this->entityManager->flush();
 
         $actions = [
             ['/orders/'.$order->getId().'/labels/reprint', $allToken],
-            [sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $item->getId()), $packageToken],
+            [sprintf('/orders/%d/labels/1/reprint', $order->getId()), $packageToken],
             ['/orders/'.$order->getId().'/print-jobs/'.$failedJob->getId().'/retry', $retryToken],
         ];
         foreach ($actions as [$action, $token]) {
@@ -1278,10 +1303,10 @@ final class OrderControllerTest extends WebTestCase
             ->setDocumentType(PrintDocumentType::LABEL)
             ->setStatus(PrintJobStatus::FAILED)
             ->setOrder($orderA)
-            ->setOrderItem($itemA)
             ->setPackageNumber(1)
             ->setPackageCount(1)
-            ->setPackageQuantity(1);
+            ->setPackageSnapshot($this->snapshotFor($orderA, 1, 1))
+            ->setLabelSetId('ownership-set');
         $this->entityManager->persist($failedJob);
         $this->entityManager->flush();
 
@@ -1412,5 +1437,26 @@ final class OrderControllerTest extends WebTestCase
         $this->entityManager->flush();
 
         return $order;
+    }
+
+    /** @return array{packageNumber: int, packageCount: int, lines: list<array{orderItemId: int|null, quantity: int, unitName: string, productTypeName: string, description: string}>} */
+    private function snapshotFor(Order $order, int $packageNumber, int $packageCount): array
+    {
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        self::assertNotNull($item->getUnit());
+        self::assertNotNull($item->getProductType());
+
+        return [
+            'packageNumber' => $packageNumber,
+            'packageCount' => $packageCount,
+            'lines' => [[
+                'orderItemId' => $item->getId(),
+                'quantity' => 1,
+                'unitName' => $item->getUnit()->getName(),
+                'productTypeName' => $item->getProductType()->getName(),
+                'description' => $item->getDescription(),
+            ]],
+        ];
     }
 }
