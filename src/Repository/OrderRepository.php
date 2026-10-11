@@ -10,6 +10,7 @@ use App\Entity\PrintJob;
 use App\Model\OrderStatus;
 use App\Model\PrintJobStatus;
 use Doctrine\DBAL\Types\Types;
+use SortDirection;
 
 /** @extends AbstractServiceEntityRepository<Order> */
 class OrderRepository extends AbstractServiceEntityRepository
@@ -34,8 +35,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->addSelect('COUNT(item.id) AS itemCount')
             ->groupBy('o.id')
             ->addGroupBy('user.id')
-            ->orderBy('o.pickupAt', 'ASC')
-            ->addOrderBy('o.orderNumber', 'ASC')
+            ->orderBy('o.pickupAt', SortDirection::Ascending)
+            ->addOrderBy('o.orderNumber', SortDirection::Ascending)
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize);
 
@@ -87,8 +88,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->select('o.id')
             ->andWhere('o.customer = :customer')
             ->setParameter('customer', $customer)
-            ->orderBy('o.pickupAt', 'DESC')
-            ->addOrderBy('o.id', 'DESC')
+            ->orderBy('o.pickupAt', SortDirection::Descending)
+            ->addOrderBy('o.id', SortDirection::Descending)
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize)
             ->getQuery()
@@ -109,8 +110,8 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->addSelect('unit')
             ->andWhere('o.id IN (:orderIds)')
             ->setParameter('orderIds', $orderIds)
-            ->orderBy('o.pickupAt', 'DESC')
-            ->addOrderBy('o.id', 'DESC')
+            ->orderBy('o.pickupAt', SortDirection::Descending)
+            ->addOrderBy('o.id', SortDirection::Descending)
             ->getQuery()
             ->getResult();
     }
@@ -180,7 +181,7 @@ class OrderRepository extends AbstractServiceEntityRepository
     {
         return $this->createCleanupQueryBuilder($cutoff)
             ->select('DISTINCT bakeryOrder')
-            ->orderBy('bakeryOrder.id', 'ASC')
+            ->orderBy('bakeryOrder.id', SortDirection::Ascending)
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -204,12 +205,12 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->setParameter('start', $start, Types::DATETIME_IMMUTABLE)
             ->setParameter('end', $end, Types::DATETIME_IMMUTABLE)
             ->setParameter('includedStatuses', [OrderStatus::OPEN->value, OrderStatus::COMPLETED->value])
-            ->orderBy('productType.sortOrder', 'ASC')
-            ->addOrderBy('productType.name', 'ASC')
-            ->addOrderBy('o.pickupAt', 'ASC')
-            ->addOrderBy('o.orderNumber', 'ASC')
-            ->addOrderBy('item.sortOrder', 'ASC')
-            ->addOrderBy('item.id', 'ASC')
+            ->orderBy('productType.sortOrder', SortDirection::Ascending)
+            ->addOrderBy('productType.name', SortDirection::Ascending)
+            ->addOrderBy('o.pickupAt', SortDirection::Ascending)
+            ->addOrderBy('o.orderNumber', SortDirection::Ascending)
+            ->addOrderBy('item.sortOrder', SortDirection::Ascending)
+            ->addOrderBy('item.id', SortDirection::Ascending)
             ->getQuery()
             ->getResult();
     }

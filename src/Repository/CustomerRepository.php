@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\Customer;
 use Doctrine\ORM\QueryBuilder;
 use libphonenumber\PhoneNumber;
+use SortDirection;
 
 /** @extends AbstractServiceEntityRepository<Customer> */
 class CustomerRepository extends AbstractServiceEntityRepository
@@ -21,7 +22,7 @@ class CustomerRepository extends AbstractServiceEntityRepository
             ->andWhere('customer.active = :active')
             ->setParameter('phone', $phone, 'phone_number')
             ->setParameter('active', true)
-            ->orderBy('customer.id', 'ASC')
+            ->orderBy('customer.id', SortDirection::Ascending)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -40,8 +41,8 @@ class CustomerRepository extends AbstractServiceEntityRepository
         $builder = $this->createQueryBuilder('customer')
             ->andWhere('customer.active = :active')
             ->setParameter('active', true)
-            ->orderBy('customer.name', 'ASC')
-            ->addOrderBy('customer.id', 'ASC')
+            ->orderBy('customer.name', SortDirection::Ascending)
+            ->addOrderBy('customer.id', SortDirection::Ascending)
             ->setMaxResults(min(max($limit, 1), 20));
 
         $this->applySearchCriteria($builder, $query, 'autocomplete');
@@ -59,8 +60,8 @@ class CustomerRepository extends AbstractServiceEntityRepository
         $query = trim($query);
 
         $builder = $this->createQueryBuilder('customer')
-            ->orderBy('customer.name', 'ASC')
-            ->addOrderBy('customer.id', 'ASC')
+            ->orderBy('customer.name', SortDirection::Ascending)
+            ->addOrderBy('customer.id', SortDirection::Ascending)
             ->setFirstResult(($page - 1) * $pageSize)
             ->setMaxResults($pageSize);
 
