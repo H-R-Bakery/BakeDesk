@@ -46,8 +46,8 @@ final class OrderLabelRenderer
                 'order' => $order,
                 'items' => $items,
                 'package' => $package,
-                'pickup_at' => $this->asBakeryLocalDateTime($order->getPickupAt()),
-                'ordered_at' => $this->asBakeryLocalDateTime($order->getOrderedAt()),
+                'pickup_at' => $order->getPickupAt(),
+                'ordered_at' => $order->getOrderedAt(),
                 'bakery_timezone' => $this->bakeryClock->getTimezoneName(),
                 'logo_svg' => $this->loadLogoSvg(),
             ]);
@@ -165,17 +165,5 @@ final class OrderLabelRenderer
         }
 
         return new PackageAllocationLine($item, $item->getQuantity(), $unit);
-    }
-
-    private function asBakeryLocalDateTime(?\DateTimeImmutable $dateTime): ?\DateTimeImmutable
-    {
-        if (null === $dateTime) {
-            return null;
-        }
-
-        return new \DateTimeImmutable(
-            $dateTime->format('Y-m-d H:i:s'),
-            new \DateTimeZone($this->bakeryClock->getTimezoneName()),
-        );
     }
 }

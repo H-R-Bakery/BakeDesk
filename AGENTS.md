@@ -823,6 +823,10 @@ Audit timestamps should be represented consistently.
 
 Pickup time is bakery-local business time and must be displayed accordingly.
 
+Persisted datetimes retain their actual instant. Presentation converts them
+using the configured bakery timezone; do not format a datetime and reconstruct
+it in another timezone.
+
 Avoid scattering timezone conversion logic throughout controllers and templates.
 
 ---

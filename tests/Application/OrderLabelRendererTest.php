@@ -63,7 +63,8 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString('Snapshot Customer', $renderedHtml);
         self::assertStringContainsString('(812) 555-1234', $renderedHtml);
         self::assertStringContainsString('Sat, Oct 10', $renderedHtml);
-        self::assertStringContainsString('1:30 PM', $renderedHtml);
+        self::assertStringContainsString('9:30 AM', $renderedHtml);
+        self::assertStringContainsString('Ordered Oct 7, 2026, 1:24 PM', $renderedHtml);
         self::assertStringContainsString('payment-paid', $renderedHtml);
         self::assertMatchesRegularExpression('/class="payment payment-paid">\s*PAID\s*<\/div>/', $renderedHtml);
         self::assertStringContainsString('Order #1234', $renderedHtml);
@@ -83,6 +84,30 @@ final class OrderLabelRendererTest extends KernelTestCase
         self::assertStringContainsString($logo, $renderedHtml);
         self::assertStringNotContainsString('Current Customer', $renderedHtml);
         self::assertStringNotContainsString('(812) 555-9999', $renderedHtml);
+    }
+
+    public function testLabelConvertsStoredUtcTimesToBakeryLocalTime(): void
+    {
+        $order = $this->createOrder()
+            ->setPickupAt(new \DateTimeImmutable('2026-10-11 19:00:00', new \DateTimeZone('UTC')))
+            ->setOrderedAt(new \DateTimeImmutable('2026-10-11 19:00:00', new \DateTimeZone('UTC')));
+        $renderedHtml = $this->renderLabel($order);
+
+        self::assertStringContainsString('Sun, Oct 11', $renderedHtml);
+        self::assertStringContainsString('3:00 PM', $renderedHtml);
+        self::assertStringContainsString('Ordered Oct 11, 2026, 3:00 PM', $renderedHtml);
+    }
+
+    public function testLabelConvertsUtcTimeToThePreviousBakeryCalendarDay(): void
+    {
+        $order = $this->createOrder()
+            ->setPickupAt(new \DateTimeImmutable('2026-10-12 02:00:00', new \DateTimeZone('UTC')))
+            ->setOrderedAt(new \DateTimeImmutable('2026-10-12 02:00:00', new \DateTimeZone('UTC')));
+        $renderedHtml = $this->renderLabel($order);
+
+        self::assertStringContainsString('Sun, Oct 11', $renderedHtml);
+        self::assertStringContainsString('10:00 PM', $renderedHtml);
+        self::assertStringContainsString('Ordered Oct 11, 2026, 10:00 PM', $renderedHtml);
     }
 
     public function testUnpaidLabelUsesBlackBackgroundAndWhiteText(): void
