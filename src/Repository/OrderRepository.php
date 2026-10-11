@@ -6,7 +6,9 @@ use App\Application\Order\OrderListRow;
 use App\Application\Order\OrderSearchCriteria;
 use App\Entity\Customer;
 use App\Entity\Order;
+use App\Entity\PrintJob;
 use App\Model\OrderStatus;
+use App\Model\PrintJobStatus;
 use Doctrine\DBAL\Types\Types;
 
 /** @extends AbstractServiceEntityRepository<Order> */
@@ -163,6 +165,27 @@ class OrderRepository extends AbstractServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function countEligibleForCleanup(\DateTimeImmutable $cutoff, ?\DateTimeImmutable $printJobCutoff = null): int
+    {
+        return (int) $this->createCleanupQueryBuilder($cutoff, $printJobCutoff)
+            ->select('COUNT(DISTINCT bakeryOrder.id)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return list<Order>
+     */
+    public function findEligibleForCleanup(\DateTimeImmutable $cutoff, int $limit): array
+    {
+        return $this->createCleanupQueryBuilder($cutoff)
+            ->select('DISTINCT bakeryOrder')
+            ->orderBy('bakeryOrder.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     /**
      * @return list<Order>
      */
@@ -237,6 +260,39 @@ class OrderRepository extends AbstractServiceEntityRepository
             $queryBuilder
                 ->andWhere('IDENTITY(o.user) = :userId')
                 ->setParameter('userId', $criteria->userId);
+        }
+
+        return $queryBuilder;
+    }
+
+    private function createCleanupQueryBuilder(\DateTimeImmutable $cutoff, ?\DateTimeImmutable $printJobCutoff = null): \Doctrine\ORM\QueryBuilder
+    {
+        $printJobReferenceQuery = $this->getEntityManager()->createQueryBuilder()
+            ->select('referencedPrintJob.id')
+            ->from(PrintJob::class, 'referencedPrintJob')
+            ->leftJoin('referencedPrintJob.orderItem', 'referencedOrderItem')
+            ->where('(referencedPrintJob.order = bakeryOrder OR referencedOrderItem.order = bakeryOrder)');
+
+        if (null !== $printJobCutoff) {
+            $printJobReferenceQuery
+                ->andWhere('(referencedPrintJob.status NOT IN (:printJobTerminalStatuses) OR referencedPrintJob.createdAt >= :printJobCutoff)');
+        }
+
+        $queryBuilder = $this->createQueryBuilder('bakeryOrder')
+            ->andWhere('bakeryOrder.status IN (:terminalStatuses)')
+            ->andWhere('bakeryOrder.pickupAt < :cutoff')
+            ->andWhere($this->getEntityManager()->getExpressionBuilder()->not($this->getEntityManager()->getExpressionBuilder()->exists($printJobReferenceQuery->getDQL())))
+            ->setParameter('terminalStatuses', [OrderStatus::COMPLETED->value, OrderStatus::CANCELLED->value])
+            ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE);
+
+        if (null !== $printJobCutoff) {
+            $queryBuilder
+                ->setParameter('printJobTerminalStatuses', [
+                    PrintJobStatus::COMPLETED->value,
+                    PrintJobStatus::FAILED->value,
+                    PrintJobStatus::CANCELLED->value,
+                ])
+                ->setParameter('printJobCutoff', $printJobCutoff, Types::DATETIME_IMMUTABLE);
         }
 
         return $queryBuilder;

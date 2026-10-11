@@ -493,6 +493,27 @@ actions are asynchronous and use POST routes protected by scoped CSRF tokens.
 Changing payment status does not create PrintJobs, reprint labels, change
 package allocation, or regenerate reports.
 
+### Automatic cleanup
+
+BakeDesk owns domain-aware cleanup through `bakedesk:cleanup`. BakeDesk-Pi owns
+scheduling and invocation. The command supports `bakedesk:cleanup --dry-run` as
+the supported preview mechanism and uses configurable retention periods for
+PrintJobs and Orders (`BAKEDESK_PRINT_JOB_RETENTION_DAYS` and
+`BAKEDESK_ORDER_RETENTION_DAYS`).
+
+Only terminal PrintJobs (`COMPLETED`, `FAILED`, and `CANCELLED`) older than the
+configured PrintJob retention period are automatically deleted. Generated
+documents may be shared by multiple PrintJobs and are deleted through
+Flysystem only after the last PrintJob reference is gone. Unreferenced
+diagnostic documents with no safe ownership and retention rule are preserved.
+
+Orders are automatically deleted only when they are old by `pickupAt`, have
+status `COMPLETED` or `CANCELLED`, and no remaining PrintJob references the
+Order or any of its OrderItems. `OPEN` Orders are never automatically deleted.
+Customers, Users, and reference/configuration data are never automatically
+deleted by cleanup. Cleanup uses Flysystem logical paths and never deployment
+filesystem paths.
+
 Diagnostic printer test submissions are intentional administrator POST actions
 with CSRF protection. They submit directly through
 `PrinterClientInterface::submitPdf()` and remain outside the asynchronous

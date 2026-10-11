@@ -6,6 +6,7 @@ use App\Entity\Order;
 use App\Entity\PrintJob;
 use App\Model\PrintDocumentType;
 use App\Model\PrintJobStatus;
+use Doctrine\DBAL\Types\Types;
 
 /** @extends AbstractServiceEntityRepository<PrintJob> */
 class PrintJobRepository extends AbstractServiceEntityRepository
@@ -44,6 +45,98 @@ class PrintJobRepository extends AbstractServiceEntityRepository
             ->setParameter('statuses', array_map(static fn (PrintJobStatus $status): string => $status->value, $statuses))
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    public function countEligibleForCleanup(\DateTimeImmutable $cutoff): int
+    {
+        return (int) $this->createQueryBuilder('printJob')
+            ->select('COUNT(printJob.id)')
+            ->andWhere('printJob.status IN (:terminalStatuses)')
+            ->andWhere('printJob.createdAt < :cutoff')
+            ->setParameter('terminalStatuses', $this->terminalStatusValues())
+            ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return list<PrintJob>
+     */
+    public function findEligibleForCleanup(\DateTimeImmutable $cutoff, int $limit, ?string $documentPath = null): array
+    {
+        $queryBuilder = $this->createQueryBuilder('printJob')
+            ->andWhere('printJob.status IN (:terminalStatuses)')
+            ->andWhere('printJob.createdAt < :cutoff')
+            ->setParameter('terminalStatuses', $this->terminalStatusValues())
+            ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
+            ->orderBy('printJob.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if (null === $documentPath) {
+            $queryBuilder->andWhere('printJob.documentPath IS NULL');
+        } else {
+            $queryBuilder
+                ->andWhere('printJob.documentPath = :documentPath')
+                ->setParameter('documentPath', $documentPath);
+        }
+
+        return $queryBuilder->getQuery()->getResult();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function findEligibleDocumentPaths(\DateTimeImmutable $cutoff, int $limit, int $offset = 0): array
+    {
+        $paths = $this->createQueryBuilder('printJob')
+            ->select('DISTINCT printJob.documentPath')
+            ->andWhere('printJob.documentPath IS NOT NULL')
+            ->andWhere('printJob.status IN (:terminalStatuses)')
+            ->andWhere('printJob.createdAt < :cutoff')
+            ->setParameter('terminalStatuses', $this->terminalStatusValues())
+            ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
+            ->orderBy('printJob.documentPath', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_values(array_filter($paths, static fn (mixed $path): bool => is_string($path)));
+    }
+
+    public function hasDocumentReference(string $documentPath): bool
+    {
+        return 0 < (int) $this->createQueryBuilder('printJob')
+            ->select('COUNT(printJob.id)')
+            ->andWhere('printJob.documentPath = :documentPath')
+            ->setParameter('documentPath', $documentPath)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function hasRemainingDocumentReferenceAfterCleanup(string $documentPath, \DateTimeImmutable $cutoff): bool
+    {
+        return 0 < (int) $this->createQueryBuilder('printJob')
+            ->select('COUNT(printJob.id)')
+            ->andWhere('printJob.documentPath = :documentPath')
+            ->andWhere('(printJob.status NOT IN (:terminalStatuses) OR printJob.createdAt >= :cutoff)')
+            ->setParameter('documentPath', $documentPath)
+            ->setParameter('terminalStatuses', $this->terminalStatusValues())
+            ->setParameter('cutoff', $cutoff, Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function terminalStatusValues(): array
+    {
+        return [
+            PrintJobStatus::COMPLETED->value,
+            PrintJobStatus::FAILED->value,
+            PrintJobStatus::CANCELLED->value,
+        ];
     }
 
     /**

@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-#[AsCommand(name: 'app:create-admin', description: 'Create a BakeDesk administrator account.')]
+#[AsCommand(name: 'bakedesk:create-admin', description: 'Create a BakeDesk administrator account.')]
 final class CreateAdminCommand extends Command
 {
     public function __construct(
