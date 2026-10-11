@@ -70,6 +70,10 @@ final class DomainMappingTest extends KernelTestCase
         self::assertTrue($printJobMetadata->getFieldMapping('packageCount')->nullable);
         self::assertTrue($printJobMetadata->getFieldMapping('packageQuantity')->nullable);
         self::assertSame('integer', $printJobMetadata->getFieldMapping('packageQuantity')->type);
+        self::assertTrue($printJobMetadata->getFieldMapping('orderPackageNumber')->nullable);
+        self::assertTrue($printJobMetadata->getFieldMapping('orderPackageCount')->nullable);
+        self::assertSame('integer', $printJobMetadata->getFieldMapping('orderPackageNumber')->type);
+        self::assertSame('integer', $printJobMetadata->getFieldMapping('orderPackageCount')->type);
         self::assertSame('date_immutable', $printJobMetadata->getFieldMapping('reportDate')->type);
         self::assertTrue($printJobMetadata->getFieldMapping('reportDate')->nullable);
 

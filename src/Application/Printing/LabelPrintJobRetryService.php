@@ -57,6 +57,8 @@ final class LabelPrintJobRetryService
                 ->setPackageNumber($failedJob->getPackageNumber())
                 ->setPackageCount($failedJob->getPackageCount())
                 ->setPackageQuantity($failedJob->getPackageQuantity())
+                ->setOrderPackageNumber($failedJob->getOrderPackageNumber())
+                ->setOrderPackageCount($failedJob->getOrderPackageCount())
                 ->setReportDate(null)
                 ->setExternalJobId(null)
                 ->setDocumentPath($documentPath)
@@ -88,6 +90,12 @@ final class LabelPrintJobRetryService
         $hasPackageNumber = null !== $failedJob->getPackageNumber();
         $hasPackageCount = null !== $failedJob->getPackageCount();
         $hasPackageQuantity = null !== $failedJob->getPackageQuantity();
+        $hasOrderPackageNumber = null !== $failedJob->getOrderPackageNumber();
+        $hasOrderPackageCount = null !== $failedJob->getOrderPackageCount();
+
+        if ($hasOrderPackageNumber !== $hasOrderPackageCount) {
+            throw PrintJobRetryException::incompletePackageContext();
+        }
 
         if ($hasOrderItem && $hasPackageNumber && $hasPackageCount && $hasPackageQuantity) {
             if ($failedJob->getOrderItem()->getOrder() !== $failedJob->getOrder()) {

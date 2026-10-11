@@ -415,6 +415,36 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame('Updated notes', $updatedOrder->getNotes());
     }
 
+    public function testEditingAnOrderWithLabelHistoryWarnsThatPrintedLabelsMayBeStale(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Stale Label Customer', '+18125551234');
+        $order = $this->createOrder('3000', $user, $productType, $unit, $customer);
+        $printer = $this->createDefaultLabelPrinter('Stale label printer');
+        $item = $order->getItems()->first();
+        self::assertInstanceOf(OrderItem::class, $item);
+        $this->entityManager->persist((new PrintJob())
+            ->setPrinter($printer)
+            ->setDocumentType(PrintDocumentType::LABEL)
+            ->setStatus(PrintJobStatus::COMPLETED)
+            ->setOrder($order)
+            ->setOrderItem($item)
+            ->setPackageNumber(1)
+            ->setPackageCount(1)
+            ->setPackageQuantity(1));
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId().'/edit');
+        $form = $crawler->selectButton('Save changes')->form();
+        $this->client->submit($form, $form->getPhpValues());
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $this->client->followRedirect();
+        self::assertSelectorTextContains('.alert-warning', 'Previously printed labels may no longer match this order. Reprint all labels before packing.');
+    }
+
     public function testOpenOrderEditPreservesAnInactiveCurrentOrderTakerWithoutExposingOtherIneligibleUsers(): void
     {
         [$eligibleUser, $inactiveUser] = $this->createUsers();
@@ -966,8 +996,39 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(1, $jobs[0]->getPackageNumber());
         self::assertSame(2, $jobs[0]->getPackageCount());
         self::assertSame(1, $jobs[0]->getPackageQuantity());
+        self::assertSame(1, $jobs[0]->getOrderPackageNumber());
+        self::assertSame(2, $jobs[0]->getOrderPackageCount());
         self::assertSame(PrintJobStatus::QUEUED, $jobs[0]->getStatus());
         self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());
+    }
+
+    public function testIndividualReprintUsesTheCurrentOrderWideBoxNumber(): void
+    {
+        [$user] = $this->createUsers();
+        [$productType] = $this->createProductTypes();
+        [$unit] = $this->createUnits();
+        $customer = $this->createCustomer('Mixed Reprint Customer', '+18125551234');
+        $order = $this->createOrder('3020', $user, $productType, $unit, $customer, OrderStatus::COMPLETED, itemCount: 2);
+        $items = $order->getItems()->toArray();
+        $items[0]->setQuantity(2);
+        $items[1]->setQuantity(1);
+        $printer = $this->createDefaultLabelPrinter('Current mixed label printer');
+        $this->entityManager->flush();
+
+        $crawler = $this->client->request('GET', '/orders/'.$order->getId());
+        $action = sprintf('/orders/%d/labels/%d/1/reprint', $order->getId(), $items[1]->getId());
+        $token = $crawler->filter('form[action="'.$action.'"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', $action, ['_token' => $token]);
+
+        self::assertResponseRedirects('/orders/'.$order->getId());
+        $jobs = $this->entityManager->getRepository(PrintJob::class)->findBy(['order' => $order], ['id' => 'ASC']);
+        self::assertCount(1, $jobs);
+        self::assertSame($printer->getId(), $jobs[0]->getPrinter()?->getId());
+        self::assertSame($items[1]->getId(), $jobs[0]->getOrderItem()?->getId());
+        self::assertSame(1, $jobs[0]->getPackageNumber());
+        self::assertSame(1, $jobs[0]->getPackageCount());
+        self::assertSame(3, $jobs[0]->getOrderPackageNumber());
+        self::assertSame(3, $jobs[0]->getOrderPackageCount());
     }
 
     public function testReprintAllCreatesOneNewJobPerCurrentPackage(): void
@@ -1030,6 +1091,10 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(2, $jobs[1]->getPackageCount());
         self::assertSame(2, $jobs[2]->getPackageNumber());
         self::assertSame(2, $jobs[2]->getPackageCount());
+        self::assertSame(1, $jobs[1]->getOrderPackageNumber());
+        self::assertSame(2, $jobs[2]->getOrderPackageNumber());
+        self::assertSame(2, $jobs[1]->getOrderPackageCount());
+        self::assertSame(2, $jobs[2]->getOrderPackageCount());
         self::assertSame($currentPrinter->getId(), $jobs[1]->getPrinter()?->getId());
         self::assertSame($historicalPrinter->getId(), $historicalJob->getPrinter()?->getId());
         self::assertSame(1, $historicalJob->getPackageCount());
@@ -1074,6 +1139,8 @@ final class OrderControllerTest extends WebTestCase
         self::assertSame(PrintJobStatus::RENDERED, $retry->getStatus());
         self::assertSame($printer->getId(), $retry->getPrinter()?->getId());
         self::assertSame($failedJob->getDocumentPath(), $retry->getDocumentPath());
+        self::assertNull($retry->getOrderPackageNumber());
+        self::assertNull($retry->getOrderPackageCount());
         self::assertNull($retry->getExternalJobId());
         self::assertSame(0, $retry->getAttemptCount());
         self::assertCount(1, self::getContainer()->get('messenger.transport.print')->getSent());

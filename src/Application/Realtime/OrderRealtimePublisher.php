@@ -65,6 +65,8 @@ final class OrderRealtimePublisher
                     'orderItemId' => $printJob->getOrderItem()?->getId(),
                     'packageNumber' => $printJob->getPackageNumber(),
                     'packageCount' => $printJob->getPackageCount(),
+                    'orderPackageNumber' => $printJob->getOrderPackageNumber(),
+                    'orderPackageCount' => $printJob->getOrderPackageCount(),
                     'errorMessage' => $printJob->getErrorMessage(),
                     'createdAt' => $printJob->getCreatedAt()->format(DATE_ATOM),
                 ]),

@@ -329,6 +329,18 @@ Labels represent physical packages or boxes, not entire Orders. A Unit marked
 `isPackageUnit` represents one physical package per whole unit; this behavior
 must come from the database flag rather than hard-coded unit names.
 
+Package identity remains item-local: `OrderItem` plus the item's package number
+identifies one allocation for previews, reprints, and latest label-job lookup.
+Physical label wording uses separate order-wide `BOX N OF N` numbering.
+`OrderPackageCalculator` assigns those numbers deterministically after combining
+each item's allocations in `OrderItem.sortOrder`, `OrderItem.id`, and package
+order. LABEL `PrintJob` rows persist the order-wide number and count as the
+historical context that was printed. Failed-job retries preserve that historical
+numbering, while current package and full-set reprints recalculate it from the
+current Order. Editing an Order never mutates prior PrintJobs or rendered
+documents; previously printed labels may become stale, so staff should reprint
+the full set when necessary.
+
 `PackagingRule` records are optional. A rule means: “When this ProductType is
 ordered using this Unit, split the quantity into packages of this capacity.”
 Package Units create one package per whole Unit quantity. Non-package Units with

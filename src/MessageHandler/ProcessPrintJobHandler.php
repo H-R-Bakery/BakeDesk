@@ -168,7 +168,7 @@ final class ProcessPrintJobHandler
         try {
             $document = PrintDocumentType::REPORT === $documentType
                 ? $this->renderReport($printJob)
-                : $this->orderLabelRenderer->render($this->labelSubject($printJob));
+                : $this->orderLabelRenderer->render($this->labelSubject($printJob), $printJob->getId());
         } catch (\Throwable $exception) {
             $subject = PrintDocumentType::REPORT === $documentType
                 ? sprintf('the production report for %s', $printJob->getReportDate()?->format('Y-m-d') ?? 'the selected date')
@@ -210,10 +210,12 @@ final class ProcessPrintJobHandler
 
         return new PackageAllocation(
             orderItem: $orderItem,
-            packageNumber: $printJob->getPackageNumber(),
-            packageCount: $printJob->getPackageCount(),
+            itemPackageNumber: $printJob->getPackageNumber(),
+            itemPackageCount: $printJob->getPackageCount(),
             quantity: $printJob->getPackageQuantity(),
             unit: $orderItem->getUnit(),
+            orderPackageNumber: $printJob->getOrderPackageNumber(),
+            orderPackageCount: $printJob->getOrderPackageCount(),
         );
     }
 
@@ -231,6 +233,10 @@ final class ProcessPrintJobHandler
         $order = $printJob->getOrder();
         if (null === $order) {
             throw new \LogicException('A label print job requires an order.');
+        }
+
+        if (null !== $printJob->getOrderPackageNumber() && null !== $printJob->getOrderPackageCount()) {
+            return sprintf('%s Order #%s Box %d of %d', $this->bakedeskBrandName, $order->getOrderNumber(), $printJob->getOrderPackageNumber(), $printJob->getOrderPackageCount());
         }
 
         if (null !== $printJob->getPackageNumber() && null !== $printJob->getPackageCount()) {

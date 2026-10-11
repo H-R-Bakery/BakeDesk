@@ -29,6 +29,12 @@ final class OrderPackageCalculator
             }
         }
 
-        return $allocations;
+        $orderPackageCount = \count($allocations);
+
+        return array_map(
+            static fn (PackageAllocation $allocation, int $index): PackageAllocation => $allocation->withOrderPackagePosition($index + 1, $orderPackageCount),
+            $allocations,
+            array_keys($allocations),
+        );
     }
 }

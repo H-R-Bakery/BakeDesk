@@ -41,20 +41,20 @@
             {% else %}
                 <div class="list-group mb-4">
                     {% for allocation in package_allocations %}
-                        {% set package_key = allocation.orderItem.id ~ ':' ~ allocation.packageNumber %}
+                        {% set package_key = allocation.orderItem.id ~ ':' ~ allocation.itemPackageNumber %}
                         {% set print_job = latest_label_jobs[package_key] ?? null %}
                         <div class="list-group-item d-flex justify-content-between align-items-center gap-3">
                             <span>
                                 <strong>{{ allocation.orderItem.productType.name }}</strong>
-                                {% if allocation.packageCount > 1 %} — Box {{ allocation.packageNumber }} of {{ allocation.packageCount }}{% endif %}
+                                — Box {{ allocation.orderPackageNumber }} of {{ allocation.orderPackageCount }}
                             </span>
                             {% if print_job %}
-                                <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.packageNumber }}" data-print-job-id="{{ print_job.id }}">
+                                <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.itemPackageNumber }}" data-print-job-id="{{ print_job.id }}">
                                     <span data-role="print-status" class="badge text-bg-{{ print_job.status.value == 'failed' ? 'danger' : (print_job.status.value == 'completed' ? 'success' : 'secondary') }}">{{ print_status_labels[print_job.status.value] }}</span>
                                     <span data-role="print-error" class="text-body-secondary ms-2"{% if print_job.status.value != 'failed' or not print_job.errorMessage %} hidden{% endif %}>{{ print_job.errorMessage ?? '' }}</span>
                                 </span>
                             {% else %}
-                                <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.packageNumber }}" data-print-job-id="">
+                                <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.itemPackageNumber }}" data-print-job-id="">
                                     <span data-role="print-status" class="badge text-bg-secondary">Not queued</span>
                                     <span data-role="print-error" class="text-body-secondary ms-2" hidden></span>
                                 </span>

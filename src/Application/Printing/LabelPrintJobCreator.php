@@ -63,15 +63,21 @@ final class LabelPrintJobCreator
         $printJobs = $this->entityManager->wrapInTransaction(function () use ($order, $printer, $allocations): array {
             $printJobs = [];
             foreach ($allocations as $allocation) {
+                if (null === $allocation->orderPackageNumber || null === $allocation->orderPackageCount) {
+                    throw new \InvalidArgumentException('A label print job requires order-wide package numbering.');
+                }
+
                 $printJob = (new PrintJob())
                     ->setPrinter($printer)
                     ->setDocumentType(PrintDocumentType::LABEL)
                     ->setStatus(PrintJobStatus::QUEUED)
                     ->setOrder($order)
                     ->setOrderItem($allocation->orderItem)
-                    ->setPackageNumber($allocation->packageNumber)
-                    ->setPackageCount($allocation->packageCount)
+                    ->setPackageNumber($allocation->itemPackageNumber)
+                    ->setPackageCount($allocation->itemPackageCount)
                     ->setPackageQuantity($allocation->quantity)
+                    ->setOrderPackageNumber($allocation->orderPackageNumber)
+                    ->setOrderPackageCount($allocation->orderPackageCount)
                     ->setReportDate(null)
                     ->setAttemptCount(0)
                     ->setDocumentPath(null);

@@ -328,7 +328,7 @@
             </div>
 
             <div class="package-count">
-                BOX {{ package ? package.packageNumber : 1 }} OF {{ package ? package.packageCount : 1 }}
+                BOX {{ package ? (package.orderPackageNumber ?? package.itemPackageNumber) : 1 }} OF {{ package ? (package.orderPackageCount ?? package.itemPackageCount) : 1 }}
             </div>
 
             <div class="metadata">

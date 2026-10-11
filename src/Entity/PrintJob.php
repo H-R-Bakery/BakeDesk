@@ -55,6 +55,14 @@ class PrintJob
     #[ORM\Column(nullable: true)]
     private ?int $packageQuantity = null;
 
+    #[Assert\Positive]
+    #[ORM\Column(nullable: true)]
+    private ?int $orderPackageNumber = null;
+
+    #[Assert\Positive]
+    #[ORM\Column(nullable: true)]
+    private ?int $orderPackageCount = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $reportDate = null;
 
@@ -185,6 +193,30 @@ class PrintJob
     public function setPackageQuantity(?int $packageQuantity): static
     {
         $this->packageQuantity = $packageQuantity;
+
+        return $this;
+    }
+
+    public function getOrderPackageNumber(): ?int
+    {
+        return $this->orderPackageNumber;
+    }
+
+    public function setOrderPackageNumber(?int $orderPackageNumber): static
+    {
+        $this->orderPackageNumber = $orderPackageNumber;
+
+        return $this;
+    }
+
+    public function getOrderPackageCount(): ?int
+    {
+        return $this->orderPackageCount;
+    }
+
+    public function setOrderPackageCount(?int $orderPackageCount): static
+    {
+        $this->orderPackageCount = $orderPackageCount;
 
         return $this;
     }

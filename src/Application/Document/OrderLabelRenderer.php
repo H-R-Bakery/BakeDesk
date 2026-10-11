@@ -30,7 +30,7 @@ final class OrderLabelRenderer
     ) {
     }
 
-    public function render(Order|PackageAllocation $subject): RenderedDocument
+    public function render(Order|PackageAllocation $subject, ?int $printJobId = null): RenderedDocument
     {
         $order = $subject instanceof PackageAllocation ? $subject->orderItem->getOrder() : $subject;
         if (null === $order) {
@@ -58,12 +58,13 @@ final class OrderLabelRenderer
             $filename = null === $package
                 ? sprintf('order-%s-%s.pdf', $this->safeOrderNumber($order), $this->safePhoneNumber($order))
                 : sprintf(
-                    'order-%s-%s-item-%s-box-%d-of-%d.pdf',
+                    'order-%s-%s-item-%s-box-%d-of-%d%s.pdf',
                     $this->safeOrderNumber($order),
                     $this->safePhoneNumber($order),
                     $this->safeItemKey($package->orderItem),
-                    $package->packageNumber,
-                    $package->packageCount,
+                    $package->itemPackageNumber,
+                    $package->itemPackageCount,
+                    null === $printJobId ? '' : '-print-job-'.$printJobId,
                 );
             $path = sprintf(
                 'labels/%s/%s/%s',
@@ -110,7 +111,7 @@ final class OrderLabelRenderer
             $lineCount += max(1, (int) ceil(mb_strlen($heading) / 42));
             $lineCount += max(1, (int) ceil(mb_strlen($item->getDescription()) / 30));
         }
-        if (null !== $package && $package->packageCount > 1) {
+        if (null !== $package && $package->itemPackageCount > 1) {
             ++$lineCount;
         }
 

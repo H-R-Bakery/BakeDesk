@@ -52,7 +52,7 @@ final class PackageCalculatorTest extends KernelTestCase
 
         self::assertCount(2, $allocations);
         self::assertSame([1, 1], array_map(static fn ($allocation): int => $allocation->quantity, $allocations));
-        self::assertSame([1, 2], array_map(static fn ($allocation): int => $allocation->packageNumber, $allocations));
+        self::assertSame([1, 2], array_map(static fn ($allocation): int => $allocation->itemPackageNumber, $allocations));
         self::assertSame('Dozen', $allocations[0]->unit->getName());
     }
 
@@ -62,7 +62,7 @@ final class PackageCalculatorTest extends KernelTestCase
 
         self::assertCount(1, $allocations);
         self::assertSame(1, $allocations[0]->quantity);
-        self::assertSame(1, $allocations[0]->packageCount);
+        self::assertSame(1, $allocations[0]->itemPackageCount);
     }
 
     public function testRuleBasedExactFitCreatesOneAllocation(): void
@@ -83,7 +83,7 @@ final class PackageCalculatorTest extends KernelTestCase
         $allocations = $this->calculator->calculate($item);
 
         self::assertSame([12, 12, 6], array_map(static fn ($allocation): int => $allocation->quantity, $allocations));
-        self::assertSame([3, 3, 3], array_map(static fn ($allocation): int => $allocation->packageCount, $allocations));
+        self::assertSame([3, 3, 3], array_map(static fn ($allocation): int => $allocation->itemPackageCount, $allocations));
     }
 
     public function testRuleBasedMultipleOverflowUsesIntegerArithmetic(): void
@@ -102,8 +102,8 @@ final class PackageCalculatorTest extends KernelTestCase
 
         self::assertCount(1, $allocations);
         self::assertSame(24, $allocations[0]->quantity);
-        self::assertSame(1, $allocations[0]->packageNumber);
-        self::assertSame(1, $allocations[0]->packageCount);
+        self::assertSame(1, $allocations[0]->itemPackageNumber);
+        self::assertSame(1, $allocations[0]->itemPackageCount);
     }
 
     public function testLargeQuantityWithoutRuleStillCreatesOnePackage(): void
@@ -112,7 +112,7 @@ final class PackageCalculatorTest extends KernelTestCase
 
         self::assertCount(1, $allocations);
         self::assertSame(100, $allocations[0]->quantity);
-        self::assertSame(1, $allocations[0]->packageCount);
+        self::assertSame(1, $allocations[0]->itemPackageCount);
     }
 
     public function testInactiveRuleFallsBackToOnePackage(): void
@@ -125,7 +125,7 @@ final class PackageCalculatorTest extends KernelTestCase
 
         self::assertCount(1, $allocations);
         self::assertSame(24, $allocations[0]->quantity);
-        self::assertSame(1, $allocations[0]->packageCount);
+        self::assertSame(1, $allocations[0]->itemPackageCount);
     }
 
     private function item(string $productName, string $unitName, int $quantity, bool $packageUnit = false): OrderItem

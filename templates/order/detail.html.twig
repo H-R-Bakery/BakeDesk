@@ -86,24 +86,22 @@
             {% else %}
                 <div class="list-group">
                     {% for allocation in package_allocations %}
-                        {% set package_key = allocation.orderItem.id ~ ':' ~ allocation.packageNumber %}
+                        {% set package_key = allocation.orderItem.id ~ ':' ~ allocation.itemPackageNumber %}
                         {% set print_job = latest_label_jobs[package_key] ?? null %}
                         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-3">
                             <div>
                                 <strong>{{ allocation.orderItem.productType.name }}</strong>
                                 — {{ allocation.quantity }} {{ allocation.unit.name }}
-                                {% if allocation.packageCount > 1 %}
-                                    — Box {{ allocation.packageNumber }} of {{ allocation.packageCount }}
-                                {% endif %}
+                                — Box {{ allocation.orderPackageNumber }} of {{ allocation.orderPackageCount }}
                                 <div class="mt-1">
                                     {% if print_job %}
                                         <span class="text-body-secondary">Status:</span>
-                                        <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.packageNumber }}" data-print-job-id="{{ print_job.id }}" class="d-inline-flex align-items-center gap-2">
+                                        <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.itemPackageNumber }}" data-print-job-id="{{ print_job.id }}" class="d-inline-flex align-items-center gap-2">
                                             <span data-role="print-status" class="badge text-bg-{{ print_job.status.value == 'failed' ? 'danger' : (print_job.status.value == 'completed' ? 'success' : 'secondary') }}">{{ print_status_labels[print_job.status.value] }}</span>
                                             <span data-role="print-error" class="text-body-secondary ms-2"{% if print_job.status.value != 'failed' or not print_job.errorMessage %} hidden{% endif %}>{{ print_job.errorMessage ?? '' }}</span>
                                         </span>
                                     {% else %}
-                                        <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.packageNumber }}" data-print-job-id="" class="d-inline-flex align-items-center gap-2">
+                                        <span data-role="package-print-status" data-order-item-id="{{ allocation.orderItem.id }}" data-package-number="{{ allocation.itemPackageNumber }}" data-print-job-id="" class="d-inline-flex align-items-center gap-2">
                                             <span data-role="print-status" class="badge text-bg-secondary">Not queued</span>
                                             <span data-role="print-error" class="text-body-secondary ms-2" hidden></span>
                                         </span>
@@ -111,10 +109,10 @@
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
-                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('order_label_package', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}" target="_blank" rel="noopener">Preview</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{{ path('order_label_package', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.itemPackageNumber}) }}" target="_blank" rel="noopener">Preview</a>
                                 {% if order.status.value in ['open', 'completed'] %}
-                                    <form method="post" action="{{ path('order_label_package_reprint', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.packageNumber}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('reprint-package-label-' ~ order.id ~ '-' ~ allocation.orderItem.id ~ '-' ~ allocation.packageNumber) }}">
+                                    <form method="post" action="{{ path('order_label_package_reprint', {id: order.id, itemId: allocation.orderItem.id, packageNumber: allocation.itemPackageNumber}) }}">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('reprint-package-label-' ~ order.id ~ '-' ~ allocation.orderItem.id ~ '-' ~ allocation.itemPackageNumber) }}">
                                         <button type="submit" class="btn btn-sm btn-outline-primary">Reprint</button>
                                     </form>
                                     {% if print_job and print_job.documentType.value == 'label' and print_job.status.value == 'failed' %}

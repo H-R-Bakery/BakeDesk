@@ -36,8 +36,8 @@ final class PackageCalculator
             return array_map(
                 fn (int $packageNumber): PackageAllocation => new PackageAllocation(
                     orderItem: $orderItem,
-                    packageNumber: $packageNumber,
-                    packageCount: $packageCount,
+                    itemPackageNumber: $packageNumber,
+                    itemPackageCount: $packageCount,
                     quantity: 1,
                     unit: $unit,
                 ),
@@ -49,8 +49,8 @@ final class PackageCalculator
         if (null === $rule) {
             return [new PackageAllocation(
                 orderItem: $orderItem,
-                packageNumber: 1,
-                packageCount: 1,
+                itemPackageNumber: 1,
+                itemPackageCount: 1,
                 quantity: $quantity,
                 unit: $unit,
             )];
@@ -71,8 +71,8 @@ final class PackageCalculator
             $packageQuantity = min($remaining, $capacity);
             $allocations[] = new PackageAllocation(
                 orderItem: $orderItem,
-                packageNumber: $packageNumber,
-                packageCount: $packageCount,
+                itemPackageNumber: $packageNumber,
+                itemPackageCount: $packageCount,
                 quantity: $packageQuantity,
                 unit: $unit,
             );

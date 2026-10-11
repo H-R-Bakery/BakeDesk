@@ -98,15 +98,24 @@ final class OrderLabelRendererTest extends KernelTestCase
     {
         $order = $this->createOrder();
         $donuts = $order->getItems()->toArray()[1];
-        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit());
+        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit(), 3, 3);
         $renderedHtml = $this->renderLabel($allocation);
 
         self::assertStringContainsString('1 Dozen', $renderedHtml);
         self::assertStringContainsString('Glazed donuts', $renderedHtml);
-        self::assertStringContainsString('BOX 1 OF 2', $renderedHtml);
+        self::assertStringContainsString('BOX 3 OF 3', $renderedHtml);
         self::assertStringNotContainsString('Brownies', $renderedHtml);
         self::assertStringContainsString('Snapshot Customer', $renderedHtml);
         self::assertStringContainsString('Order #1234', $renderedHtml);
+    }
+
+    public function testLegacyPackageAllocationFallsBackToItemLocalBoxPosition(): void
+    {
+        $order = $this->createOrder();
+        $donuts = $order->getItems()->toArray()[1];
+        $allocation = new PackageAllocation($donuts, 1, 2, 1, $donuts->getUnit());
+
+        self::assertStringContainsString('BOX 1 OF 2', $this->renderLabel($allocation));
     }
 
     public function testTooMuchItemContentFailsBeforePdfRendering(): void

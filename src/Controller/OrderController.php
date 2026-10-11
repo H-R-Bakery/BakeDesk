@@ -232,7 +232,7 @@ final class OrderController extends AbstractController
         $allocation = null;
         try {
             foreach ($orderPackageCalculator->calculate($order) as $candidate) {
-                if ($candidate->orderItem->getId() === $itemId && $candidate->packageNumber === $packageNumber) {
+                if ($candidate->orderItem->getId() === $itemId && $candidate->itemPackageNumber === $packageNumber) {
                     $allocation = $candidate;
                     break;
                 }
@@ -333,7 +333,7 @@ final class OrderController extends AbstractController
         try {
             $allocation = null;
             foreach ($orderPackageCalculator->calculate($order) as $candidate) {
-                if ($candidate->orderItem->getId() === $itemId && $candidate->packageNumber === $packageNumber) {
+                if ($candidate->orderItem->getId() === $itemId && $candidate->itemPackageNumber === $packageNumber) {
                     $allocation = $candidate;
                     break;
                 }
@@ -364,6 +364,7 @@ final class OrderController extends AbstractController
         int $id,
         Request $request,
         OrderRepository $orderRepository,
+        PrintJobRepository $printJobRepository,
         OrderFormDataFactory $orderFormDataFactory,
         NewOrderInputFactory $newOrderInputFactory,
         OrderUpdater $orderUpdater,
@@ -384,8 +385,12 @@ final class OrderController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $hasLabelHistory = [] !== $printJobRepository->findLabelJobsForOrder($order);
             $orderUpdater->update($order, $newOrderInputFactory->createInput($data));
             $this->addFlash('success', sprintf('Order #%s updated.', $order->getOrderNumber()));
+            if ($hasLabelHistory) {
+                $this->addFlash('warning', 'Previously printed labels may no longer match this order. Reprint all labels before packing.');
+            }
 
             return $this->redirectToRoute('order_detail', ['id' => $id]);
         }
@@ -565,8 +570,8 @@ final class OrderController extends AbstractController
     private function allocationLabel(PackageAllocation $allocation): string
     {
         $label = sprintf('%s — %s %s', $allocation->orderItem->getProductType()?->getName() ?? 'Package', $allocation->quantity, $allocation->unit->getName());
-        if ($allocation->packageCount > 1) {
-            $label .= sprintf(' — Box %d of %d', $allocation->packageNumber, $allocation->packageCount);
+        if (null !== $allocation->orderPackageNumber && null !== $allocation->orderPackageCount) {
+            $label .= sprintf(' — Box %d of %d', $allocation->orderPackageNumber, $allocation->orderPackageCount);
         }
 
         return $label;
