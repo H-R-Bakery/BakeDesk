@@ -153,8 +153,26 @@
             left: var(--label-horizontal-padding);
             position: absolute;
             right: var(--label-horizontal-padding);
-            text-align: center;
+            text-align: left;
             white-space: nowrap;
+        }
+
+        .packaged-by {
+            bottom: 0.82in;
+            font-size: 11pt;
+            font-weight: 700;
+            left: var(--label-horizontal-padding);
+            position: absolute;
+            right: var(--label-horizontal-padding);
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .packaged-by-line {
+            background: #000;
+            display: inline-block;
+            height: 1px;
+            width: 1in;
         }
 
         .fold-line {
@@ -331,6 +349,10 @@
 
             <div class="package-count">
                 BOX {{ package ? package.packageNumber : 1 }} OF {{ package ? package.packageCount : 1 }}
+            </div>
+
+            <div class="packaged-by">
+                PACKAGED BY: <span class="packaged-by-line"></span>
             </div>
 
             <div class="metadata">
